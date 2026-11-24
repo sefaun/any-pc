@@ -44,6 +44,7 @@ jobs:
     name: Backend image
     needs: version
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     permissions:
       contents: read
       packages: write
@@ -99,6 +100,7 @@ jobs:
   desktop:
     name: Desktop (${{ matrix.name }})
     needs: version
+    timeout-minutes: 60
     strategy:
       fail-fast: false
       matrix:
@@ -187,8 +189,8 @@ jobs:
     name: Publish GitHub Release
     needs: [version, backend-image, desktop]
     # Publish whatever desktop builds succeeded; a missing platform (e.g. no macOS
-    # runner available) must not block the others.
-    if: ${{ !cancelled() && needs.version.result == 'success' && needs.backend-image.result == 'success' }}
+    # runner available) or a failed image build must not block the installers.
+    if: ${{ !cancelled() && needs.version.result == 'success' }}
     runs-on: ubuntu-latest
     permissions:
       contents: write

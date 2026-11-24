@@ -49,6 +49,8 @@ void RtcSession::start()
     m_clipboard->setEnabled(m_settings->clipboardSyncEnabled());
     m_bridge->setStartConfig(startConfig());
     m_page = new RtcPage(m_bridge, this);
+    connect(m_page, &RtcPage::crashed, this,
+            [this]() { stop(tr("The video engine stopped unexpectedly. See the log file for details.")); });
     attachPage(m_page);
     m_page->loadApp(appUrl());
 }

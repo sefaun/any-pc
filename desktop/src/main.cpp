@@ -1,5 +1,6 @@
 #include "BuildInfo.h"
 #include "app/Application.h"
+#include "core/Logging.h"
 #include "rtc/WebEngineEnvironment.h"
 #include "ui/Theme.h"
 
@@ -30,7 +31,13 @@ bool notifyRunningInstance(const QString &instanceKey)
 
 int main(int argc, char *argv[])
 {
-    anypc::WebEngineEnvironment::prepare();
+    // Must be decided before QApplication exists (Chromium flags, GL backend).
+    bool safeMode = qEnvironmentVariableIsSet("ANYPC_SAFE_MODE");
+    for (int i = 1; i < argc; ++i) {
+        if (qstrcmp(argv[i], "--safe-mode") == 0)
+            safeMode = true;
+    }
+    anypc::WebEngineEnvironment::prepare(safeMode);
 
     QApplication::setApplicationName(QString::fromLatin1(anypc::build::kAppName));
     QApplication::setApplicationDisplayName(QString::fromLatin1(anypc::build::kAppName));
@@ -52,6 +59,8 @@ int main(int argc, char *argv[])
         QStringLiteral("Runs an isolated instance with its own settings and device identity."),
         QStringLiteral("name"));
     parser.addOption(profileOption);
+    parser.addOption(QCommandLineOption(QStringLiteral("safe-mode"),
+                                        QStringLiteral("Disables GPU acceleration (for faulty graphics drivers).")));
     parser.process(app);
 
     QString instanceKey = QString::fromLatin1(kInstanceKeyPrefix);
@@ -64,6 +73,10 @@ int main(int argc, char *argv[])
 
     if (notifyRunningInstance(instanceKey))
         return 0;
+
+    anypc::Logging::install();
+    if (safeMode)
+        qInfo("Safe mode: GPU acceleration disabled");
 
     QLocalServer::removeServer(instanceKey);
     QLocalServer instanceServer;

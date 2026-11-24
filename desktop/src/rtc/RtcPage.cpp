@@ -26,6 +26,18 @@ RtcPage::RtcPage(RtcBridge *bridge, QObject *parent)
     setWebChannel(m_channel);
     setBackgroundColor(QColor(Qt::black));
     setupPermissions();
+
+    connect(this, &QWebEnginePage::renderProcessTerminated, this,
+            [this](RenderProcessTerminationStatus status, int exitCode) {
+                if (status == NormalTerminationStatus)
+                    return;
+                const QString reason = status == CrashedTerminationStatus
+                                           ? QStringLiteral("crashed")
+                                           : status == KilledTerminationStatus ? QStringLiteral("was killed")
+                                                                                : QStringLiteral("terminated abnormally");
+                qCCritical(lcWebConsole) << "Render process" << reason << "exit code" << exitCode;
+                Q_EMIT crashed(reason);
+            });
 }
 
 void RtcPage::loadApp(const QUrl &url)

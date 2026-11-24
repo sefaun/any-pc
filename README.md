@@ -189,6 +189,11 @@ Her release'te şu dosyalar yayınlanır:
 
 Çoklu monitörde birincil ekran paylaşılır.
 
+### Sorun giderme
+
+- **Log dosyası:** **Help → Open log folder** (`anypc.log`). Windows'ta `%LOCALAPPDATA%\AnyPC\AnyPC\logs`, macOS'ta `~/Library/Application Support/AnyPC/AnyPC/logs`, Linux'ta `~/.local/share/AnyPC/AnyPC/logs`.
+- **Ekran gelirken uygulama kapanıyorsa:** büyük olasılıkla GPU sürücüsü kaynaklıdır. Uygulamayı `--safe-mode` ile başlatın (Windows'ta Başlat menüsünde **AnyPC (Safe Mode)** kısayolu) veya `ANYPC_SAFE_MODE=1` ortam değişkenini tanımlayın; GPU hızlandırması tamamen kapatılır.
+
 ### Kaynaktan derleme
 
 Gereksinimler: CMake ≥ 3.21, C++17 derleyici, Qt ≥ 6.4 (release'ler 6.8 LTS ile derlenir). Gerekli Qt modülleri: WebEngine, WebChannel, WebSockets, Positioning. Linux'ta ayrıca `libxtst-dev`.

@@ -165,14 +165,17 @@
         if (this.pc && this.pc.connectionState === 'failed') this.fail('Media connection failed');
       });
       this.pc.addEventListener('track', (event) => {
+        this.log.info('Remote track received', event.track.kind);
         this.ui.video.srcObject = new MediaStream([event.track]);
         this.ui.video.play().catch(() => {});
       });
 
       const sfu = new SfuSession(this.api, this.config.connectionId, this.pc);
       await sfu.create();
+      this.log.info('Subscribing to the host screen');
       await sfu.subscribeTracks([{ location: 'remote', trackName: info.trackName, kind: 'video' }]);
       await waitForConnection(this.pc);
+      this.log.info('Media connected; opening control channel');
 
       await sfu.establishDataChannels();
       await waitForConnection(this.pc);

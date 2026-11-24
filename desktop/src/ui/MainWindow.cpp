@@ -3,6 +3,7 @@
 #include "BuildInfo.h"
 #include "core/AppSettings.h"
 #include "core/DeviceId.h"
+#include "core/Logging.h"
 #include "session/SessionManager.h"
 #include "ui/IncomingRequestDialog.h"
 #include "ui/SettingsDialog.h"
@@ -11,6 +12,7 @@
 #include <QClipboard>
 #include <QCloseEvent>
 #include <QCompleter>
+#include <QDesktopServices>
 #include <QFrame>
 #include <QHBoxLayout>
 #include <QLabel>
@@ -211,6 +213,9 @@ void MainWindow::setupMenus()
     file->addAction(tr("&Quit"), QKeySequence::Quit, this, &MainWindow::quit);
 
     QMenu *help = menuBar()->addMenu(tr("&Help"));
+    help->addAction(tr("Open &log folder"), this,
+                    []() { QDesktopServices::openUrl(QUrl::fromLocalFile(Logging::directory())); });
+    help->addSeparator();
     help->addAction(tr("&About AnyPC"), this, &MainWindow::showAbout);
 }
 

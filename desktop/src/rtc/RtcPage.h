@@ -29,6 +29,10 @@ protected:
                                   int lineNumber, const QString &sourceId) override;
     bool acceptNavigationRequest(const QUrl &url, NavigationType type, bool isMainFrame) override;
 
+Q_SIGNALS:
+    /** The Chromium render process died; the page is unusable. */
+    void crashed(const QString &reason);
+
 private:
     void setupPermissions();
     bool isTrustedOrigin(const QUrl &origin) const;

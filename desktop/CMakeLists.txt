@@ -33,6 +33,7 @@ set(ANYPC_SOURCES
     src/app/Application.cpp            src/app/Application.h
     src/core/AppSettings.cpp           src/core/AppSettings.h
     src/core/DeviceId.cpp              src/core/DeviceId.h
+    src/core/Logging.cpp               src/core/Logging.h
     src/core/PasswordHasher.cpp        src/core/PasswordHasher.h
     src/network/ApiClient.cpp          src/network/ApiClient.h
     src/network/SignalingClient.cpp    src/network/SignalingClient.h

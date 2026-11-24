@@ -74,6 +74,7 @@
         sendEncodings: [{ maxBitrate: this.config.capture.maxBitrate, maxFramerate: this.config.capture.frameRate }],
       });
 
+      this.log.info(`Screen captured (${width}x${height}); publishing`);
       this.bridge.reportState('connecting', 'Publishing screen');
       const sfu = new SfuSession(this.api, this.config.connectionId, this.pc);
       await sfu.create();

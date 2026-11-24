@@ -75,14 +75,23 @@ void RtcPage::setupPermissions()
 #endif
 
 #if QT_VERSION >= QT_VERSION_CHECK(6, 7, 0)
-    // Unattended capture: always pick the first (primary) screen without UI.
+    // Unattended capture: select the requested screen without showing a picker.
     connect(this, &QWebEnginePage::desktopMediaRequested, this,
-            [](const QWebEngineDesktopMediaRequest &request) {
+            [this](const QWebEngineDesktopMediaRequest &request) {
                 const QAbstractListModel *screens = request.screensModel();
-                if (screens && screens->rowCount() > 0)
-                    request.selectScreen(screens->index(0));
-                else
+                const int count = screens ? screens->rowCount() : 0;
+                if (count == 0) {
                     request.cancel();
+                    return;
+                }
+                QStringList names;
+                for (int row = 0; row < count; ++row) {
+                    const QString name = screens->data(screens->index(row), Qt::DisplayRole).toString();
+                    names.append(name.isEmpty() ? QStringLiteral("Screen %1").arg(row + 1) : name);
+                }
+                const int selected = qBound(0, m_screenIndex, count - 1);
+                request.selectScreen(screens->index(selected));
+                Q_EMIT screensEnumerated(names, selected);
             });
 #endif
 }

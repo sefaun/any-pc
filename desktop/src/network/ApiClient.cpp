@@ -35,7 +35,11 @@ ApiClient::ApiClient(QObject *parent)
 
 void ApiClient::setBaseUrl(const QUrl &serverUrl)
 {
-    m_baseUrl = serverUrl.adjusted(QUrl::StripTrailingSlash);
+    m_baseUrl = serverUrl;
+    QString path = m_baseUrl.path();
+    while (path.endsWith(QLatin1Char('/')))
+        path.chop(1);
+    m_baseUrl.setPath(path);
 }
 
 void ApiClient::setAccessToken(const QString &token)

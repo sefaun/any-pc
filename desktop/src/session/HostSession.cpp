@@ -3,6 +3,14 @@
 #include "input/InputInjector.h"
 #include "rtc/RtcBridge.h"
 #include "rtc/RtcPage.h"
+#include "session/ScreenMatcher.h"
+#include "ui/ScreenBorderOverlay.h"
+
+#include <QGuiApplication>
+#include <QJsonArray>
+#include <QLoggingCategory>
+#include <QPixmap>
+#include <QScreen>
 
 #include <QSize>
 
@@ -35,15 +43,77 @@ HostSession::HostSession(const QString &connectionId, const protocol::DeviceSumm
         if (const auto event = InputEvent::fromJson(json))
             m_injector->handle(*event);
     });
-    connect(bridge(), &RtcBridge::captureSizeChanged, this,
-            [this](int width, int height) { m_injector->setCaptureSize(QSize(width, height)); });
+    connect(bridge(), &RtcBridge::captureChanged, this, &HostSession::onCaptureChanged);
+    connect(bridge(), &RtcBridge::screenSelectionRequested, this, [this](int index) {
+        if (page())
+            page()->setScreenIndex(index);
+    });
     connect(bridge(), &RtcBridge::stateReported, this, [this](const QString &state, const QString &) {
-        if (state == QLatin1String("connected") && !m_injector->isSupported())
+        if (state != QLatin1String("connected"))
+            return;
+        m_connected = true;
+        updateOverlays();
+        if (!m_injector->isSupported())
             Q_EMIT warning(m_injector->unsupportedReason());
     });
 }
 
-HostSession::~HostSession() = default;
+HostSession::~HostSession()
+{
+    qDeleteAll(m_overlays);
+}
+
+void HostSession::onCaptureChanged(int width, int height, const QByteArray &thumbnail)
+{
+    const QSize size(width, height);
+    m_injector->setCaptureSize(size);
+
+    const QList<ScreenMatcher::Candidate> candidates = ScreenMatcher::currentScreens();
+    const int index = ScreenMatcher::match(candidates, size, thumbnail, [](const ScreenMatcher::Candidate &c) {
+        return c.screen ? c.screen->grabWindow(0).toImage() : QImage();
+    });
+
+    m_sharedScreens.clear();
+    if (index >= 0) {
+        QScreen *screen = candidates.at(index).screen;
+        m_sharedScreens.append(screen);
+        m_injector->setTargetScreen(screen);
+    } else {
+        // The capture spans the whole desktop: map input over it and frame every screen.
+        for (QScreen *screen : QGuiApplication::screens())
+            m_sharedScreens.append(screen);
+        m_injector->setTargetScreen(nullptr);
+    }
+    updateOverlays();
+}
+
+void HostSession::onScreensEnumerated(const QStringList &names, int selected)
+{
+    QJsonArray screens;
+    for (int i = 0; i < names.size(); ++i)
+        screens.append(QJsonObject{{QStringLiteral("index"), i}, {QStringLiteral("name"), names.at(i)}});
+    Q_EMIT bridge()->screensUpdated(QJsonObject{{QStringLiteral("screens"), screens},
+                                                {QStringLiteral("current"), selected}});
+}
+
+void HostSession::updateOverlays()
+{
+    if (!m_connected || isStopping())
+        return;
+    const QString caption = tr("AnyPC · %1 is viewing this screen").arg(peer().name);
+    while (m_overlays.size() < m_sharedScreens.size())
+        m_overlays.append(new ScreenBorderOverlay());
+    for (int i = 0; i < m_overlays.size(); ++i) {
+        QScreen *screen = i < m_sharedScreens.size() ? m_sharedScreens.at(i).data() : nullptr;
+        m_overlays.at(i)->showOn(screen, screen ? caption : QString());
+    }
+}
+
+void HostSession::hideOverlays()
+{
+    for (ScreenBorderOverlay *overlay : std::as_const(m_overlays))
+        overlay->hide();
+}
 
 QUrl HostSession::appUrl() const
 {
@@ -65,14 +135,16 @@ QJsonObject HostSession::startConfig() const
     };
 }
 
-void HostSession::attachPage(RtcPage *)
+void HostSession::attachPage(RtcPage *page)
 {
-    // The host page runs off-screen; nothing to embed.
+    // The host page runs off-screen; only its screen enumeration is of interest.
+    connect(page, &RtcPage::screensEnumerated, this, &HostSession::onScreensEnumerated);
 }
 
 void HostSession::onStopping()
 {
     m_injector->releaseAll();
+    hideOverlays();
 }
 
 } // namespace anypc

@@ -28,8 +28,12 @@ endif()
 
 configure_file(src/app/BuildInfo.h.in ${CMAKE_CURRENT_BINARY_DIR}/generated/BuildInfo.h @ONLY)
 
-set(ANYPC_SOURCES
-    src/main.cpp
+option(ANYPC_BUILD_TESTS "Build the unit tests" ON)
+
+# ---------------------------------------------------------------------------
+# anypc_lib: all application code, shared by the executable and the tests.
+# ---------------------------------------------------------------------------
+set(ANYPC_LIB_SOURCES
     src/app/Application.cpp            src/app/Application.h
     src/core/AppSettings.cpp           src/core/AppSettings.h
     src/core/DeviceId.cpp              src/core/DeviceId.h
@@ -46,6 +50,8 @@ set(ANYPC_SOURCES
     src/session/HostSession.cpp        src/session/HostSession.h
     src/session/ViewerSession.cpp      src/session/ViewerSession.h
     src/session/SessionManager.cpp     src/session/SessionManager.h
+    src/session/ScreenMatcher.cpp      src/session/ScreenMatcher.h
+    src/transfer/FileTransferManager.cpp src/transfer/FileTransferManager.h
     src/input/InputEvent.cpp           src/input/InputEvent.h
     src/input/InputInjector.cpp        src/input/InputInjector.h
     src/input/KeyCodeMap.cpp           src/input/KeyCodeMap.h
@@ -54,46 +60,65 @@ set(ANYPC_SOURCES
     src/ui/SettingsDialog.cpp          src/ui/SettingsDialog.h
     src/ui/ServerSetupDialog.cpp       src/ui/ServerSetupDialog.h
     src/ui/ViewerWindow.cpp            src/ui/ViewerWindow.h
+    src/ui/FileTransferDialog.cpp      src/ui/FileTransferDialog.h
+    src/ui/ScreenBorderOverlay.cpp     src/ui/ScreenBorderOverlay.h
     src/ui/Theme.cpp                   src/ui/Theme.h
-    resources/resources.qrc
 )
 
 if(WIN32)
-    list(APPEND ANYPC_SOURCES src/input/platform/WindowsInputInjector.cpp packaging/windows/anypc.rc)
+    list(APPEND ANYPC_LIB_SOURCES src/input/platform/WindowsInputInjector.cpp)
 elseif(APPLE)
-    list(APPEND ANYPC_SOURCES src/input/platform/MacInputInjector.mm)
-    set(MACOSX_BUNDLE_ICON_FILE AnyPC.icns)
-    set(ANYPC_ICNS ${CMAKE_CURRENT_SOURCE_DIR}/resources/icons/AnyPC.icns)
-    set_source_files_properties(${ANYPC_ICNS} PROPERTIES MACOSX_PACKAGE_LOCATION Resources)
-    list(APPEND ANYPC_SOURCES ${ANYPC_ICNS})
+    list(APPEND ANYPC_LIB_SOURCES src/input/platform/MacInputInjector.mm)
 else()
-    list(APPEND ANYPC_SOURCES src/input/platform/X11InputInjector.cpp)
+    list(APPEND ANYPC_LIB_SOURCES src/input/platform/X11InputInjector.cpp)
 endif()
 
-qt_add_executable(anypc WIN32 MACOSX_BUNDLE ${ANYPC_SOURCES})
-
-target_include_directories(anypc PRIVATE src ${CMAKE_CURRENT_BINARY_DIR}/generated)
-
-target_compile_definitions(anypc PRIVATE
+add_library(anypc_lib STATIC ${ANYPC_LIB_SOURCES})
+target_include_directories(anypc_lib PUBLIC src ${CMAKE_CURRENT_BINARY_DIR}/generated)
+target_compile_definitions(anypc_lib PUBLIC
     QT_NO_KEYWORDS
     QT_USE_QSTRINGBUILDER
     QT_DISABLE_DEPRECATED_UP_TO=0x060000)
-
 if(MSVC)
-    target_compile_options(anypc PRIVATE /W4 /permissive- /utf-8)
+    target_compile_options(anypc_lib PUBLIC /W4 /permissive- /utf-8)
 else()
-    target_compile_options(anypc PRIVATE -Wall -Wextra -Wpedantic)
+    target_compile_options(anypc_lib PUBLIC -Wall -Wextra -Wpedantic)
 endif()
-
-target_link_libraries(anypc PRIVATE
+target_link_libraries(anypc_lib PUBLIC
     Qt6::Core Qt6::Gui Qt6::Widgets Qt6::Network Qt6::WebSockets
     Qt6::WebChannel Qt6::WebEngineCore Qt6::WebEngineWidgets)
 
 if(WIN32)
-    target_link_libraries(anypc PRIVATE user32)
+    target_link_libraries(anypc_lib PUBLIC user32)
+elseif(APPLE)
+    target_link_libraries(anypc_lib PUBLIC "-framework ApplicationServices" "-framework CoreGraphics" "-framework Carbon")
+else()
+    find_package(X11 REQUIRED)
+    if(NOT X11_XTest_FOUND)
+        message(FATAL_ERROR "libXtst development files are required (e.g. libxtst-dev)")
+    endif()
+    target_link_libraries(anypc_lib PUBLIC X11::X11 X11::Xtst)
+endif()
+
+# ---------------------------------------------------------------------------
+# anypc: the application.
+# ---------------------------------------------------------------------------
+set(ANYPC_APP_SOURCES src/main.cpp resources/resources.qrc)
+if(WIN32)
+    list(APPEND ANYPC_APP_SOURCES packaging/windows/anypc.rc)
+elseif(APPLE)
+    set(MACOSX_BUNDLE_ICON_FILE AnyPC.icns)
+    set(ANYPC_ICNS ${CMAKE_CURRENT_SOURCE_DIR}/resources/icons/AnyPC.icns)
+    set_source_files_properties(${ANYPC_ICNS} PROPERTIES MACOSX_PACKAGE_LOCATION Resources)
+    list(APPEND ANYPC_APP_SOURCES ${ANYPC_ICNS})
+endif()
+
+qt_add_executable(anypc WIN32 MACOSX_BUNDLE ${ANYPC_APP_SOURCES})
+target_link_libraries(anypc PRIVATE anypc_lib)
+
+if(WIN32)
     set_target_properties(anypc PROPERTIES OUTPUT_NAME "AnyPC")
 elseif(APPLE)
-    target_link_libraries(anypc PRIVATE "-framework ApplicationServices" "-framework CoreGraphics" "-framework Carbon")
     set_target_properties(anypc PROPERTIES
         OUTPUT_NAME "AnyPC"
         MACOSX_BUNDLE_INFO_PLIST ${CMAKE_CURRENT_SOURCE_DIR}/packaging/macos/Info.plist.in
@@ -101,12 +126,11 @@ elseif(APPLE)
         MACOSX_BUNDLE_BUNDLE_NAME "AnyPC"
         MACOSX_BUNDLE_BUNDLE_VERSION "${PROJECT_VERSION}"
         MACOSX_BUNDLE_SHORT_VERSION_STRING "${PROJECT_VERSION}")
-else()
-    find_package(X11 REQUIRED)
-    if(NOT X11_XTest_FOUND)
-        message(FATAL_ERROR "libXtst development files are required (e.g. libxtst-dev)")
-    endif()
-    target_link_libraries(anypc PRIVATE X11::X11 X11::Xtst)
+endif()
+
+if(ANYPC_BUILD_TESTS)
+    enable_testing()
+    add_subdirectory(tests)
 endif()
 
 include(GNUInstallDirs)

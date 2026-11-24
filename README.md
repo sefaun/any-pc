@@ -177,7 +177,11 @@ Her release'te şu dosyalar yayınlanır:
 - **Remote computer**: bağlanılacak adresi yazıp **Connect**'e basın. Karşı tarafta gözetimsiz erişim açıksa şifreyi de yazın.
 - **Gözetimsiz erişim**: *Configure unattended access…* ile şifre belirleyin. Şifre cihazda PBKDF2-SHA256 ile hash'lenmiş olarak saklanır ve doğrulama host tarafında yapılır. Yanlış şifreyle gelen istek otomatik reddedilir.
 - Pencere kapatıldığında uygulama sistem tepsisinde çalışmaya devam eder (ayarlardan kapatılabilir).
-- Viewer penceresi: **Disconnect**, **Full screen**, **Send clipboard**. Bu düğmelerin klavye kısayolu yoktur; tüm tuşlar uzak bilgisayara gider.
+- Viewer penceresi: **Disconnect**, **Full screen**, **Send clipboard**, **Send files**, **Transfers** ve (birden fazla monitör varsa) **ekran seçici**. Bu düğmelerin klavye kısayolu yoktur; tüm tuşlar uzak bilgisayara gider.
+- **Çoklu monitör:** Kontrol eden taraf araç çubuğundaki listeden uzak bilgisayarın hangi ekranını göreceğini seçer; görüntü yeniden bağlanmadan değişir, fare/klavye seçilen ekrana yönlenir.
+- **Ekran çerçevesi:** Kontrol edilen bilgisayarda paylaşılan ekranın kenarlarında kırmızı bir çerçeve ve "AnyPC · … is viewing this screen" etiketi görünür. Çerçeve tıklamaları engellemez.
+- **Dosya aktarımı:** İki yönlüdür. Viewer'da **Send files**, kontrol edilen tarafta ana penceredeki **Send files…** düğmesiyle dosya seçilir. Gelen dosyalar `İndirilenler/AnyPC` klasörüne kaydedilir (aynı isim varsa `ad (1).uzantı`). Aktarım penceresinde ilerleme görünür.
+- **Bildirimler:** Karşı taraf bağlantıyı kapatırsa ya da bağlantı koparsa, kapatılana kadar ekranda kalan bir bilgi penceresi ve sistem tepsisi bildirimi gösterilir.
 
 ### Platform notları
 
@@ -187,7 +191,7 @@ Her release'te şu dosyalar yayınlanır:
 | **Windows** | UIPI kuralı gereği yönetici olarak çalışan pencerelere input gönderebilmek için AnyPC'nin de yönetici olarak çalışması gerekir. UAC onay ekranı ve kilit ekranı (secure desktop) yakalanamaz. Installer imzasızdır, SmartScreen uyarı verebilir. |
 | **Linux** | Uzaktan kontrol için **X11** oturumu gerekir (XTest). Wayland'de ekran görüntülenebilir ama input enjeksiyonu desteklenmez; viewer "view only" moduna geçer. |
 
-Çoklu monitörde birincil ekran paylaşılır.
+Ekran seçimi Qt 6.7+ ile derlenen sürümlerde (release'ler 6.8) çalışır. Daha eski Qt ile kaynak koddan derlenirse masaüstünün tamamı tek görüntü olarak paylaşılır.
 
 ### Sorun giderme
 
@@ -204,6 +208,12 @@ cmake --build build --parallel
 ```
 
 Aynı makinede iki istemciyi denemek için her birine ayrı bir profil verin (ayrı ayar ve cihaz kimliği kullanır):
+
+Birim testleri:
+
+```bash
+QT_QPA_PLATFORM=offscreen ctest --test-dir build --output-on-failure
+```
 
 ```bash
 ./build/anypc --profile a

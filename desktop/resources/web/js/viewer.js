@@ -179,11 +179,16 @@
 
       await sfu.establishDataChannels();
       await waitForConnection(this.pc);
-      const [allocation] = await sfu.createDataChannels([
-        { location: 'remote', dataChannelName: info.dataChannelName, canReply: true },
-      ]);
+      const wanted = [{ location: 'remote', dataChannelName: info.dataChannelName, canReply: true }];
+      if (info.filesChannelName) wanted.push({ location: 'remote', dataChannelName: info.filesChannelName, canReply: true });
+      const allocations = await sfu.createDataChannels(wanted);
+      const idOf = (name) => allocations.find((a) => a.dataChannelName === name).id;
 
-      this.channel = this.pc.createDataChannel(info.dataChannelName, { negotiated: true, id: allocation.id });
+      if (info.filesChannelName) {
+        const filesChannel = this.pc.createDataChannel(info.filesChannelName, { negotiated: true, id: idOf(info.filesChannelName) });
+        this.files = new window.AnyPCFiles.FileTransferChannel(this.bridge, filesChannel, this.log);
+      }
+      this.channel = this.pc.createDataChannel(info.dataChannelName, { negotiated: true, id: idOf(info.dataChannelName) });
       this.channel.addEventListener('message', (event) => this.onControlMessage(event.data));
       this.channel.addEventListener('open', () => {
         sendJson(this.channel, { t: 'hello' });
@@ -197,9 +202,15 @@
     onControlMessage(data) {
       const message = parseJson(data);
       if (!message) return;
-      if (message.t === 'clip' && typeof message.text === 'string') {
+      if (message.t === 'info') {
+        this.bridge.remoteScreens({ screens: Array.isArray(message.screens) ? message.screens : [], current: message.current || 0 });
+      } else if (message.t === 'clip' && typeof message.text === 'string') {
         this.bridge.remoteClipboard(message.text.slice(0, MAX_CLIPBOARD_LENGTH));
       }
+    }
+
+    requestScreen(index) {
+      sendJson(this.channel, { t: 'screen', index });
     }
 
     sendClipboard(text) {
@@ -254,6 +265,7 @@
     });
     bridge.peerSignal.connect((payload) => controller && controller.onPeerSignal(payload));
     bridge.localClipboard.connect((text) => controller && controller.sendClipboard(text));
+    bridge.screenRequested.connect((index) => controller && controller.requestScreen(index));
     bridge.stop.connect(() => controller && controller.stop());
     bridge.pageReady();
   })();

@@ -9,7 +9,10 @@
 #endif
 #include <windows.h>
 
+#include <QScreen>
+
 #include <cmath>
+#include <string>
 
 namespace anypc {
 
@@ -35,6 +38,35 @@ protected:
         }
         areas.append(virtualDesktop());
         return areas;
+    }
+
+    QRectF nativeRect(const QScreen &screen) const override
+    {
+        // Qt names Windows screens after their GDI device (e.g. "\\.\DISPLAY2").
+        struct Search
+        {
+            std::wstring device;
+            QRectF result;
+        } search{screen.name().toStdWString(), QRectF()};
+        EnumDisplayMonitors(
+            nullptr, nullptr,
+            [](HMONITOR monitor, HDC, LPRECT, LPARAM data) -> BOOL {
+                auto *s = reinterpret_cast<Search *>(data);
+                MONITORINFOEXW info{};
+                info.cbSize = sizeof(info);
+                if (GetMonitorInfoW(monitor, &info) && s->device == info.szDevice) {
+                    const RECT &r = info.rcMonitor;
+                    s->result = QRectF(r.left, r.top, r.right - r.left, r.bottom - r.top);
+                    return FALSE;
+                }
+                return TRUE;
+            },
+            reinterpret_cast<LPARAM>(&search));
+        if (search.result.isValid())
+            return search.result;
+        const qreal dpr = screen.devicePixelRatio();
+        const QRect g = screen.geometry();
+        return QRectF(g.x() * dpr, g.y() * dpr, g.width() * dpr, g.height() * dpr);
     }
 
     void movePointer(const QPointF &pos) override

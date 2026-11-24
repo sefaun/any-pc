@@ -1,7 +1,9 @@
 #pragma once
 
+#include <QJsonObject>
 #include <QMainWindow>
 
+class QComboBox;
 class QLabel;
 class QWebEnginePage;
 class QWebEngineView;
@@ -21,10 +23,15 @@ public:
 
 public Q_SLOTS:
     void setSessionState(const QString &state, const QString &detail);
+    /** Host screen list: {screens:[{index,name}], current}. */
+    void setRemoteScreens(const QJsonObject &info);
 
 Q_SIGNALS:
     void disconnectRequested();
     void sendClipboardRequested();
+    void sendFilesRequested();
+    void showTransfersRequested();
+    void screenSelected(int index);
 
 protected:
     void closeEvent(QCloseEvent *event) override;
@@ -35,6 +42,8 @@ private:
 
     QWebEngineView *m_view;
     QLabel *m_status;
+    QComboBox *m_screens;
+    QAction *m_screensAction = nullptr;
     QAction *m_fullScreenAction;
     bool m_closingByUser = false;
 };

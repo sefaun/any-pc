@@ -8,6 +8,7 @@
         <file alias="web/css/viewer.css">web/css/viewer.css</file>
         <file alias="web/js/rtc-common.js">web/js/rtc-common.js</file>
         <file alias="web/js/frame-keepalive.js">web/js/frame-keepalive.js</file>
+        <file alias="web/js/file-transfer.js">web/js/file-transfer.js</file>
         <file alias="web/js/host.js">web/js/host.js</file>
         <file alias="web/js/viewer.js">web/js/viewer.js</file>
     </qresource>

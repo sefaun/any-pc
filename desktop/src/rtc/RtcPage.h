@@ -1,5 +1,6 @@
 #pragma once
 
+#include <QStringList>
 #include <QWebEnginePage>
 
 class QWebChannel;
@@ -24,6 +25,10 @@ public:
 
     void loadApp(const QUrl &url);
 
+    /** Screen (index in Chromium's screen list) used by the next desktop capture. */
+    void setScreenIndex(int index) { m_screenIndex = index; }
+    int screenIndex() const { return m_screenIndex; }
+
 protected:
     void javaScriptConsoleMessage(JavaScriptConsoleMessageLevel level, const QString &message,
                                   int lineNumber, const QString &sourceId) override;
@@ -32,12 +37,15 @@ protected:
 Q_SIGNALS:
     /** The Chromium render process died; the page is unusable. */
     void crashed(const QString &reason);
+    /** Emitted on every desktop capture with the screens Chromium can capture. */
+    void screensEnumerated(const QStringList &names, int selected);
 
 private:
     void setupPermissions();
     bool isTrustedOrigin(const QUrl &origin) const;
 
     QWebChannel *m_channel;
+    int m_screenIndex = 0;
 };
 
 } // namespace anypc

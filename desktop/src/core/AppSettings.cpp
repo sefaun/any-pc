@@ -42,7 +42,8 @@ QUrl AppSettings::serverUrl() const
 
 void AppSettings::setServerUrl(const QUrl &url)
 {
-    const QUrl normalized = url.adjusted(QUrl::StripTrailingSlash);
+    const QUrl cleaned = normalizeServerUrl(url.toString());
+    const QUrl normalized = cleaned.isValid() ? cleaned : url;
     if (m_settings.contains(Key::ServerUrl) && normalized == serverUrl())
         return;
     m_settings.setValue(Key::ServerUrl, normalized.toString());
@@ -69,7 +70,11 @@ QUrl AppSettings::normalizeServerUrl(const QString &input)
     // Only scheme, host, port and an optional base path are meaningful.
     url.setQuery(QString());
     url.setFragment(QString());
-    return url.adjusted(QUrl::StripTrailingSlash);
+    QString path = url.path();
+    while (path.endsWith(QLatin1Char('/')))
+        path.chop(1);
+    url.setPath(path);
+    return url;
 }
 
 QString AppSettings::deviceName() const

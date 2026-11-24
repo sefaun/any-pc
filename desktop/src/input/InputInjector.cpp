@@ -1,6 +1,7 @@
 #include "input/InputInjector.h"
 
 #include <QLoggingCategory>
+#include <QScreen>
 
 #include <cmath>
 #include <limits>
@@ -17,8 +18,17 @@ void InputInjector::setCaptureSize(const QSize &size)
     qCInfo(lcInput) << "Capture size" << size << "mapped to native area" << area;
 }
 
+void InputInjector::setTargetScreen(const QScreen *screen)
+{
+    m_targetRect = screen ? nativeRect(*screen) : QRectF();
+    qCInfo(lcInput) << "Target screen" << (screen ? screen->name() : QStringLiteral("<inferred>")) << "native area"
+                    << targetArea();
+}
+
 QRectF InputInjector::targetArea() const
 {
+    if (m_targetRect.isValid())
+        return m_targetRect;
     const QList<QRectF> areas = candidateAreas();
     if (areas.isEmpty())
         return {};

@@ -80,7 +80,8 @@ void IncomingRequestDialog::finish(bool accepted)
     m_answered = true;
     m_timer.stop();
     Q_EMIT answered(m_connectionId, accepted);
-    close();
+    // done() hides the dialog; close() would route back into reject() and keep it open.
+    QDialog::done(accepted ? QDialog::Accepted : QDialog::Rejected);
 }
 
 } // namespace anypc

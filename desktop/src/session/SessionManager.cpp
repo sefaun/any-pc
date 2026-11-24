@@ -211,6 +211,8 @@ void SessionManager::onSessionFinished(const QString &connectionId, const QStrin
     if (session->role() == protocol::Role::Host)
         Q_EMIT hostSessionEnded();
     Q_EMIT notification(reason);
+    if (!session->endedByUser())
+        Q_EMIT sessionEndedRemotely(session->peer(), session->role(), reason);
     session->disconnect(this);
     QTimer::singleShot(kSessionDisposeDelayMs, session, &QObject::deleteLater);
 }
@@ -219,7 +221,27 @@ void SessionManager::endHostSession()
 {
     for (RtcSession *session : m_sessions.values()) {
         if (session->role() == protocol::Role::Host)
-            session->stop(tr("You ended the session."));
+            session->stopByUser(tr("You ended the session."));
+    }
+}
+
+void SessionManager::sendFilesToViewer(QWidget *dialogParent)
+{
+    for (RtcSession *session : std::as_const(m_sessions)) {
+        if (session->role() == protocol::Role::Host) {
+            session->chooseAndSendFiles(dialogParent);
+            return;
+        }
+    }
+}
+
+void SessionManager::showHostTransfers()
+{
+    for (RtcSession *session : std::as_const(m_sessions)) {
+        if (session->role() == protocol::Role::Host) {
+            session->showFileTransfers();
+            return;
+        }
     }
 }
 
@@ -235,7 +257,7 @@ bool SessionManager::isBeingControlled() const
 void SessionManager::endAll()
 {
     for (RtcSession *session : m_sessions.values())
-        session->stop(tr("Session closed."));
+        session->stopByUser(tr("Session closed."));
     cancelOutgoing();
 }
 

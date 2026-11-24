@@ -1,6 +1,7 @@
 #include "rtc/RtcBridge.h"
 
 #include "network/ApiClient.h"
+#include "transfer/FileTransferManager.h"
 
 #include <QJsonArray>
 #include <QJsonDocument>
@@ -72,9 +73,65 @@ void RtcBridge::inputEvent(const QJsonObject &event)
     Q_EMIT inputReceived(event);
 }
 
-void RtcBridge::captureStarted(int width, int height)
+void RtcBridge::setFileTransfers(FileTransferManager *files)
 {
-    Q_EMIT captureSizeChanged(width, height);
+    m_files = files;
+    connect(files, &FileTransferManager::offerFile, this, &RtcBridge::fileOffer);
+}
+
+void RtcBridge::captureStarted(int width, int height, const QString &thumbnail)
+{
+    Q_EMIT captureChanged(width, height, QByteArray::fromBase64(thumbnail.toLatin1()));
+}
+
+bool RtcBridge::selectScreen(int index)
+{
+    // Direct connection: the capture parameters are updated before we return.
+    Q_EMIT screenSelectionRequested(index);
+    return true;
+}
+
+void RtcBridge::remoteScreens(const QJsonObject &info)
+{
+    Q_EMIT remoteScreensReceived(info);
+}
+
+void RtcBridge::fileChannelReady(bool ready)
+{
+    if (m_files)
+        m_files->setChannelReady(ready);
+}
+
+QString RtcBridge::fileReadChunk(const QString &id)
+{
+    return m_files ? m_files->readChunk(id) : QString();
+}
+
+void RtcBridge::fileSendFinished(const QString &id, bool ok, const QString &error)
+{
+    if (m_files)
+        m_files->finishOutgoing(id, ok, error);
+}
+
+bool RtcBridge::fileIncoming(const QString &id, const QString &name, double size)
+{
+    return m_files && m_files->beginIncoming(id, name, static_cast<qint64>(size));
+}
+
+bool RtcBridge::fileWriteChunk(const QString &id, const QString &data)
+{
+    return m_files && m_files->writeChunk(id, data);
+}
+
+bool RtcBridge::fileIncomingFinished(const QString &id)
+{
+    return m_files && m_files->finishIncoming(id);
+}
+
+void RtcBridge::fileIncomingFailed(const QString &id, const QString &error)
+{
+    if (m_files)
+        m_files->failIncoming(id, error);
 }
 
 void RtcBridge::remoteClipboard(const QString &text)

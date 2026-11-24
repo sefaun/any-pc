@@ -47,6 +47,7 @@ private:
     void refreshRecent();
     void startConnection();
     void setOutgoingBusy(bool busy, const QString &text = {});
+    void notifySessionEnded(const protocol::DeviceSummary &peer, protocol::Role role, const QString &reason);
     void showIncomingRequest(const QString &connectionId, const protocol::DeviceSummary &from, int expiresInMs);
     void openSettings();
     void showAbout();

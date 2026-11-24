@@ -6,6 +6,7 @@
 #include <Carbon/Carbon.h>
 
 #include <QElapsedTimer>
+#include <QScreen>
 
 #include <cmath>
 
@@ -63,6 +64,13 @@ protected:
             areas.append(QRectF(all.origin.x, all.origin.y, all.size.width, all.size.height));
         }
         return areas;
+    }
+
+    QRectF nativeRect(const QScreen &screen) const override
+    {
+        // Qt and Quartz share the global coordinate space (points, origin at the
+        // top-left of the main display).
+        return QRectF(screen.geometry());
     }
 
     void movePointer(const QPointF &pos) override

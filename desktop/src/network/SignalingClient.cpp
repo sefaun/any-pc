@@ -17,9 +17,12 @@ constexpr int kMaxBackoffMs = 30000;
 
 QUrl toWebSocketUrl(const QUrl &serverUrl)
 {
-    QUrl url = serverUrl.adjusted(QUrl::StripTrailingSlash);
+    QUrl url = serverUrl;
+    QString path = url.path();
+    while (path.endsWith(QLatin1Char('/')))
+        path.chop(1);
     url.setScheme(url.scheme() == QLatin1String("https") ? QStringLiteral("wss") : QStringLiteral("ws"));
-    url.setPath(url.path() + QStringLiteral("/ws"));
+    url.setPath(path + QStringLiteral("/ws"));
     return url;
 }
 } // namespace

@@ -2,11 +2,17 @@
 
 #include "session/RtcSession.h"
 
+#include <QList>
+#include <QPointer>
+
 #include <memory>
+
+class QScreen;
 
 namespace anypc {
 
 class InputInjector;
+class ScreenBorderOverlay;
 
 /**
  * The controlled side: captures and publishes the screen through the SFU in
@@ -30,7 +36,16 @@ protected:
     void onStopping() override;
 
 private:
+    void onCaptureChanged(int width, int height, const QByteArray &thumbnail);
+    void onScreensEnumerated(const QStringList &names, int selected);
+    void updateOverlays();
+    void hideOverlays();
+
     std::unique_ptr<InputInjector> m_injector;
+    QList<ScreenBorderOverlay *> m_overlays;
+    /** Screens shown in the capture (several when the whole desktop is captured). */
+    QList<QPointer<QScreen>> m_sharedScreens;
+    bool m_connected = false;
 };
 
 } // namespace anypc

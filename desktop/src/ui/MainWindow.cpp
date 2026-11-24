@@ -106,6 +106,7 @@ MainWindow::MainWindow(AppSettings *settings, SessionManager *sessions, QWidget 
     });
     connect(m_sessions, &SessionManager::hostSessionEnded, m_controlBanner, &QWidget::hide);
     connect(m_sessions, &SessionManager::notification, this, &MainWindow::showMessage);
+    connect(m_sessions, &SessionManager::sessionEndedRemotely, this, &MainWindow::notifySessionEnded);
 }
 
 QWidget *MainWindow::buildLocalCard()
@@ -197,9 +198,15 @@ QFrame *MainWindow::buildControlBanner()
     auto *layout = new QHBoxLayout(banner);
     layout->setContentsMargins(14, 8, 8, 8);
     m_controlLabel = new QLabel(banner);
+    auto *sendFiles = new QPushButton(tr("Send files…"), banner);
+    connect(sendFiles, &QPushButton::clicked, this, [this]() { m_sessions->sendFilesToViewer(this); });
+    auto *transfers = new QPushButton(tr("Transfers"), banner);
+    connect(transfers, &QPushButton::clicked, m_sessions, &SessionManager::showHostTransfers);
     auto *end = new QPushButton(tr("Disconnect"), banner);
     connect(end, &QPushButton::clicked, m_sessions, &SessionManager::endHostSession);
     layout->addWidget(m_controlLabel, 1);
+    layout->addWidget(sendFiles);
+    layout->addWidget(transfers);
     layout->addWidget(end);
     banner->hide();
     return banner;
@@ -268,6 +275,28 @@ void MainWindow::setServerState(ServerState state, const QString &detail)
     m_statusDot->setStyleSheet(QStringLiteral("color: %1;").arg(color));
     m_statusText->setText(text);
     m_connectButton->setEnabled(state == ServerState::Online && !m_sessions->hasOutgoingRequest());
+}
+
+void MainWindow::notifySessionEnded(const protocol::DeviceSummary &peer, protocol::Role role, const QString &reason)
+{
+    const QString who = QStringLiteral("%1 (%2)").arg(peer.name, DeviceId::format(peer.id));
+    const QString title = role == protocol::Role::Host ? tr("Remote control ended") : tr("Connection closed");
+    const QString text = role == protocol::Role::Host
+                             ? tr("%1 is no longer connected to this computer.").arg(who)
+                             : tr("The session with %1 has ended.").arg(who);
+
+    if (m_tray)
+        m_tray->showMessage(title, text + QLatin1Char('\n') + reason, QSystemTrayIcon::Information, 8000);
+
+    // A non-modal box stays visible until acknowledged, so the event is not missed.
+    auto *box = new QMessageBox(QMessageBox::Information, title, text, QMessageBox::Ok, this);
+    box->setInformativeText(reason);
+    box->setAttribute(Qt::WA_DeleteOnClose);
+    box->setWindowModality(Qt::NonModal);
+    box->setWindowFlag(Qt::WindowStaysOnTopHint);
+    box->show();
+    box->raise();
+    QApplication::alert(box);
 }
 
 void MainWindow::showMessage(const QString &message)

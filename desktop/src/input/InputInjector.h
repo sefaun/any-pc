@@ -12,6 +12,8 @@
 
 #include <memory>
 
+class QScreen;
+
 namespace anypc {
 
 /**
@@ -39,6 +41,12 @@ public:
     /** Size of the captured video, used to determine which area it shows. */
     void setCaptureSize(const QSize &size);
 
+    /**
+     * The monitor shown in the captured video. When set, pointer coordinates
+     * map onto this screen; when null the area is inferred from the capture size.
+     */
+    void setTargetScreen(const QScreen *screen);
+
     void handle(const InputEvent &event);
 
     /** Releases every key and button still held down by the remote side. */
@@ -54,6 +62,9 @@ protected:
      */
     virtual QList<QRectF> candidateAreas() const = 0;
 
+    /** Native rectangle of a Qt screen in the platform API's coordinate space. */
+    virtual QRectF nativeRect(const QScreen &screen) const = 0;
+
     virtual void movePointer(const QPointF &nativePos) = 0;
     virtual void pointerButton(MouseButton button, bool pressed, const QPointF &nativePos) = 0;
     virtual void wheel(double dxPixels, double dyPixels) = 0;
@@ -66,6 +77,7 @@ private:
     QRectF targetArea() const;
 
     QSize m_captureSize;
+    QRectF m_targetRect;
     QSet<QString> m_pressedKeys;
     QSet<int> m_pressedButtons;
     QPointF m_lastPosition{0.5, 0.5};

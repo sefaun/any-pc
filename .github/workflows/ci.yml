@@ -59,3 +59,7 @@ jobs:
           cache: true
       - run: cmake -S desktop -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
       - run: cmake --build build --parallel
+      - name: Unit tests
+        env:
+          QT_QPA_PLATFORM: offscreen
+        run: ctest --test-dir build --output-on-failure

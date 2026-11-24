@@ -6,6 +6,8 @@
 #include <QObject>
 #include <QPointer>
 
+class QWidget;
+
 namespace anypc {
 
 class ApiClient;
@@ -37,6 +39,9 @@ public:
     /** Ends the session in which this device is being controlled, if any. */
     void endHostSession();
     bool isBeingControlled() const;
+    /** Host side: send files to the controlling device / show transfers. */
+    void sendFilesToViewer(QWidget *dialogParent);
+    void showHostTransfers();
 
     void endAll();
 
@@ -47,6 +52,9 @@ Q_SIGNALS:
     void outgoingFinished();
     void hostSessionStarted(const anypc::protocol::DeviceSummary &viewer);
     void hostSessionEnded();
+    /** A session ended without the local user asking for it (peer left, network, ...). */
+    void sessionEndedRemotely(const anypc::protocol::DeviceSummary &peer, anypc::protocol::Role role,
+                              const QString &reason);
     void notification(const QString &message);
 
 private:

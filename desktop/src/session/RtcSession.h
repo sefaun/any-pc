@@ -8,11 +8,15 @@
 #include <QPointer>
 #include <QUrl>
 
+class QWidget;
+
 namespace anypc {
 
 class ApiClient;
 class AppSettings;
 class ClipboardSync;
+class FileTransferDialog;
+class FileTransferManager;
 class RtcBridge;
 class RtcPage;
 
@@ -42,6 +46,14 @@ public:
     void deliverPeerSignal(const QJsonObject &payload);
     /** Tears the session down. Idempotent; emits finished() once. */
     void stop(const QString &reason);
+    /** Ends the session because the local user asked for it (no notification). */
+    void stopByUser(const QString &reason);
+    bool endedByUser() const { return m_endedByUser; }
+
+    FileTransferManager *fileTransfers() const { return m_files; }
+    /** Lets the user pick files and sends them to the peer. */
+    void chooseAndSendFiles(QWidget *dialogParent = nullptr);
+    void showFileTransfers();
 
 Q_SIGNALS:
     void stateChanged(const QString &state, const QString &detail);
@@ -63,6 +75,7 @@ protected:
     virtual void onStopping() {}
 
     RtcBridge *bridge() const { return m_bridge; }
+    RtcPage *page() const;
     ClipboardSync *clipboard() const { return m_clipboard; }
     AppSettings *settings() const { return m_settings; }
     bool isStopping() const { return m_stopping; }
@@ -75,10 +88,13 @@ private:
     AppSettings *m_settings;
     RtcBridge *m_bridge;
     ClipboardSync *m_clipboard;
+    FileTransferManager *m_files;
+    QPointer<FileTransferDialog> m_filesDialog;
     QPointer<RtcPage> m_page;
     QList<QJsonObject> m_pendingSignals;
     QString m_state = QStringLiteral("idle");
     bool m_stopping = false;
+    bool m_endedByUser = false;
 };
 
 } // namespace anypc

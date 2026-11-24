@@ -16,13 +16,17 @@ ViewerSession::ViewerSession(const QString &connectionId, const protocol::Device
     m_window = new ViewerWindow(title);
     m_window->setAttribute(Qt::WA_DeleteOnClose, false);
 
-    connect(m_window, &ViewerWindow::disconnectRequested, this, [this]() { stop(tr("Disconnected")); });
+    connect(m_window, &ViewerWindow::disconnectRequested, this, [this]() { stopByUser(tr("You ended the session.")); });
     connect(m_window, &ViewerWindow::sendClipboardRequested, this, [this]() {
         const QString text = clipboard()->currentText();
         if (!text.isEmpty())
             Q_EMIT bridge()->localClipboard(text);
     });
     connect(this, &RtcSession::stateChanged, m_window, &ViewerWindow::setSessionState);
+    connect(m_window, &ViewerWindow::sendFilesRequested, this, [this]() { chooseAndSendFiles(m_window); });
+    connect(m_window, &ViewerWindow::showTransfersRequested, this, &RtcSession::showFileTransfers);
+    connect(m_window, &ViewerWindow::screenSelected, bridge(), &RtcBridge::screenRequested);
+    connect(bridge(), &RtcBridge::remoteScreensReceived, m_window, &ViewerWindow::setRemoteScreens);
 }
 
 ViewerSession::~ViewerSession()

@@ -2,6 +2,9 @@
 
 #include <QAction>
 #include <QCloseEvent>
+#include <QComboBox>
+#include <QJsonArray>
+#include <QSignalBlocker>
 #include <QGuiApplication>
 #include <QLabel>
 #include <QScreen>
@@ -15,6 +18,7 @@ ViewerWindow::ViewerWindow(const QString &title, QWidget *parent)
     : QMainWindow(parent)
     , m_view(new QWebEngineView(this))
     , m_status(new QLabel(this))
+    , m_screens(new QComboBox(this))
 {
     setWindowTitle(title);
     setMinimumSize(640, 400);
@@ -30,6 +34,21 @@ ViewerWindow::ViewerWindow(const QString &title, QWidget *parent)
                                             tr("Full screen"), this, &ViewerWindow::toggleFullScreen);
     toolbar->addAction(style()->standardIcon(QStyle::SP_FileDialogContentsView), tr("Send clipboard"), this,
                        &ViewerWindow::sendClipboardRequested);
+    toolbar->addAction(style()->standardIcon(QStyle::SP_ArrowUp), tr("Send files"), this,
+                       &ViewerWindow::sendFilesRequested);
+    toolbar->addAction(style()->standardIcon(QStyle::SP_FileDialogListView), tr("Transfers"), this,
+                       &ViewerWindow::showTransfersRequested);
+
+    toolbar->addSeparator();
+    m_screens->setToolTip(tr("Remote screen"));
+    m_screens->setFocusPolicy(Qt::NoFocus);
+    m_screens->setSizeAdjustPolicy(QComboBox::AdjustToContents);
+    m_screensAction = toolbar->addWidget(m_screens);
+    m_screensAction->setVisible(false);
+    connect(m_screens, QOverload<int>::of(&QComboBox::activated), this, [this](int row) {
+        Q_EMIT screenSelected(m_screens->itemData(row).toInt());
+        m_view->setFocus();
+    });
 
     auto *spacer = new QWidget(toolbar);
     spacer->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Preferred);
@@ -69,6 +88,24 @@ void ViewerWindow::setSessionState(const QString &state, const QString &detail)
     if (!detail.isEmpty() && state != QLatin1String("connected"))
         text += QStringLiteral(" — ") + detail;
     m_status->setText(text);
+}
+
+void ViewerWindow::setRemoteScreens(const QJsonObject &info)
+{
+    const QJsonArray screens = info.value(QLatin1String("screens")).toArray();
+    const int current = info.value(QLatin1String("current")).toInt();
+    const QSignalBlocker blocker(m_screens);
+    m_screens->clear();
+    for (const QJsonValue &value : screens) {
+        const QJsonObject screen = value.toObject();
+        const int index = screen.value(QLatin1String("index")).toInt();
+        const QString name = screen.value(QLatin1String("name")).toString();
+        m_screens->addItem(name.isEmpty() ? tr("Screen %1").arg(index + 1) : name, index);
+        if (index == current)
+            m_screens->setCurrentIndex(m_screens->count() - 1);
+    }
+    // Only worth showing when there is something to choose from.
+    m_screensAction->setVisible(m_screens->count() > 1);
 }
 
 void ViewerWindow::toggleFullScreen()

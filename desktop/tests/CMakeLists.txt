@@ -1,0 +1,15 @@
+find_package(Qt6 REQUIRED COMPONENTS Test)
+
+function(anypc_add_test name)
+    qt_add_executable(${name} ${name}.cpp)
+    target_link_libraries(${name} PRIVATE anypc_lib Qt6::Test)
+    set_target_properties(${name} PROPERTIES WIN32_EXECUTABLE OFF MACOSX_BUNDLE OFF)
+    add_test(NAME ${name} COMMAND ${name})
+    set_tests_properties(${name} PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
+endfunction()
+
+anypc_add_test(tst_core)
+anypc_add_test(tst_input)
+anypc_add_test(tst_screenmatcher)
+anypc_add_test(tst_filetransfer)
+anypc_add_test(tst_dialogs)

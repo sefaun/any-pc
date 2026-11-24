@@ -4,6 +4,11 @@
 #include "rtc/RtcBridge.h"
 #include "rtc/RtcPage.h"
 #include "session/ClipboardSync.h"
+#include "transfer/FileTransferManager.h"
+#include "ui/FileTransferDialog.h"
+
+#include <QFileDialog>
+#include <QStandardPaths>
 
 #include <QTimer>
 
@@ -24,7 +29,16 @@ RtcSession::RtcSession(const QString &connectionId, const protocol::DeviceSummar
     , m_settings(settings)
     , m_bridge(new RtcBridge(api, connectionId, this))
     , m_clipboard(new ClipboardSync(this))
+    , m_files(new FileTransferManager(
+          QStandardPaths::writableLocation(QStandardPaths::DownloadLocation) + QStringLiteral("/AnyPC"), this))
 {
+    m_bridge->setFileTransfers(m_files);
+    // Surface the transfer window whenever something starts moving.
+    connect(m_files, &FileTransferManager::transferAdded, this, [this]() {
+        if (!m_stopping)
+            showFileTransfers();
+    });
+
     connect(m_bridge, &RtcBridge::signalToPeer, this,
             [this](const QJsonObject &payload) { Q_EMIT outgoingSignal(m_connectionId, payload); });
 
@@ -42,7 +56,33 @@ RtcSession::RtcSession(const QString &connectionId, const protocol::DeviceSummar
     connect(m_clipboard, &ClipboardSync::localTextChanged, m_bridge, &RtcBridge::localClipboard);
 }
 
-RtcSession::~RtcSession() = default;
+RtcSession::~RtcSession()
+{
+    delete m_filesDialog;
+}
+
+RtcPage *RtcSession::page() const
+{
+    return m_page;
+}
+
+void RtcSession::showFileTransfers()
+{
+    if (!m_filesDialog) {
+        m_filesDialog = new FileTransferDialog(m_files, m_peer.name);
+        connect(m_filesDialog, &FileTransferDialog::sendFilesRequested, this,
+                [this]() { chooseAndSendFiles(m_filesDialog); });
+    }
+    m_filesDialog->show();
+    m_filesDialog->raise();
+}
+
+void RtcSession::chooseAndSendFiles(QWidget *dialogParent)
+{
+    const QStringList paths = QFileDialog::getOpenFileNames(dialogParent, tr("Send files to %1").arg(m_peer.name));
+    if (!paths.isEmpty())
+        m_files->sendFiles(paths);
+}
 
 void RtcSession::start()
 {
@@ -73,12 +113,20 @@ void RtcSession::flushPendingSignals()
         Q_EMIT m_bridge->peerSignal(payload);
 }
 
+void RtcSession::stopByUser(const QString &reason)
+{
+    if (!m_stopping)
+        m_endedByUser = true;
+    stop(reason);
+}
+
 void RtcSession::stop(const QString &reason)
 {
     if (m_stopping)
         return;
     m_stopping = true;
     m_clipboard->setEnabled(false);
+    m_files->abortAll(tr("Session ended"));
     onStopping();
     Q_EMIT m_bridge->stop();
     m_state = QStringLiteral("closed");

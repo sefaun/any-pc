@@ -158,6 +158,7 @@ jobs:
           if [[ "$RUNNER_OS" == "macOS" ]]; then EXTRA+=(-DCMAKE_OSX_ARCHITECTURES="arm64;x86_64" -DCMAKE_OSX_DEPLOYMENT_TARGET=12.0); fi
           cmake -S desktop -B build -G Ninja \
             -DCMAKE_BUILD_TYPE=Release \
+            -DANYPC_BUILD_TESTS=OFF \
             -DANYPC_VERSION="$NUMERIC_VERSION" \
             -DANYPC_DEFAULT_SERVER_URL="$SERVER_URL" \
             "${EXTRA[@]}"

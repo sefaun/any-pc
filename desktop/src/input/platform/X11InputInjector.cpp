@@ -71,6 +71,13 @@ protected:
         return areas;
     }
 
+    QRectF nativeRect(const QScreen &screen) const override
+    {
+        const qreal dpr = screen.devicePixelRatio();
+        const QRect g = screen.geometry();
+        return QRectF(g.x() * dpr, g.y() * dpr, g.width() * dpr, g.height() * dpr);
+    }
+
     void movePointer(const QPointF &pos) override
     {
         XTestFakeMotionEvent(m_display, -1, int(std::lround(pos.x())), int(std::lround(pos.y())), CurrentTime);

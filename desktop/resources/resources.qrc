@@ -1,0 +1,14 @@
+<!DOCTYPE RCC>
+<RCC version="1.0">
+    <qresource prefix="/">
+        <file alias="icons/anypc.svg">icons/anypc.svg</file>
+        <file alias="icons/anypc-256.png">icons/anypc-256.png</file>
+        <file alias="web/host.html">web/host.html</file>
+        <file alias="web/viewer.html">web/viewer.html</file>
+        <file alias="web/css/viewer.css">web/css/viewer.css</file>
+        <file alias="web/js/rtc-common.js">web/js/rtc-common.js</file>
+        <file alias="web/js/frame-keepalive.js">web/js/frame-keepalive.js</file>
+        <file alias="web/js/host.js">web/js/host.js</file>
+        <file alias="web/js/viewer.js">web/js/viewer.js</file>
+    </qresource>
+</RCC>

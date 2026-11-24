@@ -1,0 +1,219 @@
+name: Release
+
+# Pushing a tag such as v1.2.3 builds and publishes:
+#   - the backend Docker image to GitHub Container Registry (repository "Packages")
+#   - Windows (.exe installer), macOS (.dmg) and Linux (.AppImage) desktop builds,
+#     attached to a GitHub Release for the tag.
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to build without tagging (e.g. 0.0.0-test)'
+        required: true
+        default: '0.0.0-dev'
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  QT_VERSION: '6.8.3'
+  QT_MODULES: 'qtwebengine qtwebchannel qtwebsockets qtpositioning'
+
+jobs:
+  version:
+    name: Resolve version
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.v.outputs.version }}
+      numeric: ${{ steps.v.outputs.numeric }}
+    steps:
+      - id: v
+        shell: bash
+        run: |
+          if [[ "${GITHUB_REF_TYPE}" == "tag" ]]; then RAW="${GITHUB_REF_NAME#v}"; else RAW="${{ github.event.inputs.version }}"; fi
+          NUMERIC=$(echo "$RAW" | grep -oE '^[0-9]+\.[0-9]+\.[0-9]+' || echo "0.0.0")
+          echo "version=$RAW" >> "$GITHUB_OUTPUT"
+          echo "numeric=$NUMERIC" >> "$GITHUB_OUTPUT"
+          echo "Version: $RAW (numeric $NUMERIC)"
+
+  backend-image:
+    name: Backend image
+    needs: version
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+
+      - name: Verify backend
+        working-directory: backend
+        run: |
+          npm ci
+          npm run lint
+          npm run typecheck
+          npm test -- --silent
+
+      - uses: docker/setup-qemu-action@v3
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository_owner }}/any-pc-backend
+          tags: |
+            type=semver,pattern={{version}},value=v${{ needs.version.outputs.version }}
+            type=semver,pattern={{major}}.{{minor}},value=v${{ needs.version.outputs.version }}
+            type=raw,value=latest,enable=${{ github.ref_type == 'tag' && !contains(needs.version.outputs.version, '-') }}
+            type=raw,value=${{ needs.version.outputs.version }},enable=${{ github.ref_type != 'tag' }}
+          labels: |
+            org.opencontainers.image.title=anypc-backend
+            org.opencontainers.image.description=AnyPC signaling server and Cloudflare Realtime SFU broker
+
+      - uses: docker/build-push-action@v6
+        with:
+          context: backend
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          build-args: VERSION=${{ needs.version.outputs.version }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  desktop:
+    name: Desktop (${{ matrix.name }})
+    needs: version
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: windows
+            os: windows-2022
+            qt-arch: win64_msvc2022_64
+          - name: macos
+            os: macos-14
+            qt-arch: clang_64
+          - name: linux
+            os: ubuntu-22.04
+            qt-arch: linux_gcc_64
+    runs-on: ${{ matrix.os }}
+    env:
+      VERSION: ${{ needs.version.outputs.version }}
+      NUMERIC_VERSION: ${{ needs.version.outputs.numeric }}
+      SERVER_URL: ${{ vars.ANYPC_SERVER_URL || 'http://localhost:3000' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Linux build dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends ninja-build libgl1-mesa-dev libxtst-dev libx11-dev \
+            libxkbcommon-x11-0 libxcb-cursor0 libxcb-icccm4 libxcb-image0 libxcb-keysyms1 libxcb-randr0 \
+            libxcb-render-util0 libxcb-shape0 libxcb-xinerama0 libxcb-xkb1 libnss3 libxcomposite1 \
+            libxdamage1 libxrandr2 libxkbfile1 libfuse2 libegl1
+
+      - name: Install macOS build dependencies
+        if: runner.os == 'macOS'
+        run: brew install ninja
+
+      - name: Install Inno Setup
+        if: runner.os == 'Windows'
+        run: choco install innosetup -y --no-progress
+
+      - uses: ilammy/msvc-dev-cmd@v1
+        if: runner.os == 'Windows'
+
+      - name: Install Qt
+        uses: jurplel/install-qt-action@v4
+        with:
+          version: ${{ env.QT_VERSION }}
+          arch: ${{ matrix.qt-arch }}
+          modules: ${{ env.QT_MODULES }}
+          cache: true
+
+      - name: Configure
+        shell: bash
+        run: |
+          EXTRA=()
+          if [[ "$RUNNER_OS" == "macOS" ]]; then EXTRA+=(-DCMAKE_OSX_ARCHITECTURES="arm64;x86_64" -DCMAKE_OSX_DEPLOYMENT_TARGET=12.0); fi
+          cmake -S desktop -B build -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DANYPC_VERSION="$NUMERIC_VERSION" \
+            -DANYPC_DEFAULT_SERVER_URL="$SERVER_URL" \
+            "${EXTRA[@]}"
+
+      - name: Build
+        run: cmake --build build --parallel
+
+      - name: Package (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: ./desktop/packaging/windows/build-installer.ps1 -BuildDir build -Version $env:VERSION -OutputDir dist
+
+      - name: Package (macOS)
+        if: runner.os == 'macOS'
+        run: ./desktop/packaging/macos/build-dmg.sh build "$VERSION" dist
+
+      - name: Package (Linux)
+        if: runner.os == 'Linux'
+        run: ./desktop/packaging/linux/build-appimage.sh build "$VERSION" dist
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: anypc-${{ matrix.name }}
+          path: dist/*
+          if-no-files-found: error
+          retention-days: 14
+
+  publish:
+    name: Publish GitHub Release
+    needs: [version, backend-image, desktop]
+    if: github.ref_type == 'tag'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          pattern: anypc-*
+          merge-multiple: true
+
+      - name: Checksums
+        working-directory: artifacts
+        run: sha256sum * > SHA256SUMS.txt && cat SHA256SUMS.txt
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: artifacts/*
+          prerelease: ${{ contains(needs.version.outputs.version, '-') }}
+          generate_release_notes: true
+          body: |
+            ## Desktop
+            | Platform | File |
+            | --- | --- |
+            | Windows 10/11 (x64) | `AnyPC-Setup-${{ needs.version.outputs.version }}-x64.exe` |
+            | macOS 12+ (Universal) | `AnyPC-${{ needs.version.outputs.version }}-macOS.dmg` |
+            | Linux x86_64 (X11) | `AnyPC-${{ needs.version.outputs.version }}-x86_64.AppImage` |
+
+            ## Backend
+            ```bash
+            docker pull ghcr.io/${{ github.repository_owner }}/any-pc-backend:${{ needs.version.outputs.version }}
+            ```

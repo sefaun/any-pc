@@ -1,0 +1,14 @@
+# Example deployment. Copy to docker-compose.yml, create a .env next to it
+# (see .env.example) and run: docker compose up -d
+services:
+  anypc-backend:
+    image: ghcr.io/sefaun/any-pc-backend:latest
+    restart: unless-stopped
+    env_file: .env
+    ports:
+      - "3000:3000"
+    volumes:
+      - anypc-data:/app/data
+
+volumes:
+  anypc-data:

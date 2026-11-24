@@ -1,0 +1,15 @@
+---
+BasedOnStyle: Qt
+ColumnLimit: 120
+AccessModifierOffset: -4
+AllowShortFunctionsOnASingleLine: Inline
+BreakBeforeBraces: Custom
+BraceWrapping:
+  AfterClass: true
+  AfterFunction: true
+  AfterStruct: true
+  AfterNamespace: false
+  AfterControlStatement: false
+IncludeBlocks: Preserve
+SortIncludes: true
+Standard: c++17

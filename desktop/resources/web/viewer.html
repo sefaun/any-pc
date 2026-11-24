@@ -1,0 +1,19 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>AnyPC Viewer</title>
+    <link rel="stylesheet" href="css/viewer.css" />
+  </head>
+  <body>
+    <video id="screen" autoplay playsinline muted tabindex="0"></video>
+    <div id="overlay">
+      <div id="spinner" class="spinner"></div>
+      <p id="status">Starting…</p>
+    </div>
+    <script src="qrc:///qtwebchannel/qwebchannel.js"></script>
+    <script src="js/rtc-common.js"></script>
+    <script src="js/viewer.js"></script>
+  </body>
+</html>

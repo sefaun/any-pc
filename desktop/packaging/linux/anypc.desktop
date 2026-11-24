@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=AnyPC
+GenericName=Remote Desktop
+Comment=Control remote computers and share your screen
+Exec=anypc
+Icon=anypc
+Terminal=false
+Categories=Network;RemoteAccess;Qt;
+Keywords=remote;desktop;support;vnc;
+StartupWMClass=AnyPC

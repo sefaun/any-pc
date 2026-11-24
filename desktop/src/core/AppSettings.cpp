@@ -1,0 +1,143 @@
+#include "core/AppSettings.h"
+
+#include "BuildInfo.h"
+#include "core/PasswordHasher.h"
+
+#include <QSysInfo>
+
+namespace anypc {
+
+namespace {
+namespace Key {
+constexpr auto ServerUrl = "network/serverUrl";
+constexpr auto DeviceName = "device/name";
+constexpr auto DeviceId = "device/id";
+constexpr auto DeviceSecret = "device/secret";
+constexpr auto UnattendedHash = "security/unattendedPasswordHash";
+constexpr auto MinimizeToTray = "ui/minimizeToTray";
+constexpr auto ClipboardSync = "session/clipboardSync";
+constexpr auto Recent = "ui/recentConnections";
+} // namespace Key
+
+constexpr int kMaxRecentConnections = 8;
+} // namespace
+
+AppSettings::AppSettings(QObject *parent)
+    : QObject(parent)
+{
+}
+
+QUrl AppSettings::serverUrl() const
+{
+    const QUrl url(m_settings.value(Key::ServerUrl, QString::fromLatin1(build::kDefaultServerUrl)).toString());
+    return url.isValid() ? url : QUrl(QString::fromLatin1(build::kDefaultServerUrl));
+}
+
+void AppSettings::setServerUrl(const QUrl &url)
+{
+    if (url == serverUrl())
+        return;
+    m_settings.setValue(Key::ServerUrl, url.toString(QUrl::StripTrailingSlash));
+    Q_EMIT serverUrlChanged(url);
+}
+
+QString AppSettings::deviceName() const
+{
+    const QString name = m_settings.value(Key::DeviceName).toString().trimmed();
+    if (!name.isEmpty())
+        return name;
+    const QString host = QSysInfo::machineHostName().trimmed();
+    return host.isEmpty() ? QStringLiteral("AnyPC Device") : host.left(64);
+}
+
+void AppSettings::setDeviceName(const QString &name)
+{
+    const QString trimmed = name.trimmed().left(64);
+    if (trimmed == deviceName())
+        return;
+    m_settings.setValue(Key::DeviceName, trimmed);
+    Q_EMIT deviceNameChanged(deviceName());
+}
+
+QString AppSettings::deviceId() const
+{
+    return m_settings.value(Key::DeviceId).toString();
+}
+
+QString AppSettings::deviceSecret() const
+{
+    return m_settings.value(Key::DeviceSecret).toString();
+}
+
+void AppSettings::setDeviceCredentials(const QString &deviceId, const QString &deviceSecret)
+{
+    m_settings.setValue(Key::DeviceId, deviceId);
+    m_settings.setValue(Key::DeviceSecret, deviceSecret);
+    m_settings.sync();
+}
+
+void AppSettings::clearDeviceCredentials()
+{
+    m_settings.remove(Key::DeviceId);
+    m_settings.remove(Key::DeviceSecret);
+}
+
+bool AppSettings::hasUnattendedPassword() const
+{
+    return !m_settings.value(Key::UnattendedHash).toString().isEmpty();
+}
+
+void AppSettings::setUnattendedPassword(const QString &password)
+{
+    m_settings.setValue(Key::UnattendedHash, PasswordHasher::hash(password));
+    Q_EMIT unattendedAccessChanged(true);
+}
+
+void AppSettings::clearUnattendedPassword()
+{
+    m_settings.remove(Key::UnattendedHash);
+    Q_EMIT unattendedAccessChanged(false);
+}
+
+bool AppSettings::verifyUnattendedPassword(const QString &password) const
+{
+    const QString encoded = m_settings.value(Key::UnattendedHash).toString();
+    return !encoded.isEmpty() && !password.isEmpty() && PasswordHasher::verify(password, encoded);
+}
+
+bool AppSettings::minimizeToTray() const
+{
+    return m_settings.value(Key::MinimizeToTray, true).toBool();
+}
+
+void AppSettings::setMinimizeToTray(bool enabled)
+{
+    m_settings.setValue(Key::MinimizeToTray, enabled);
+}
+
+bool AppSettings::clipboardSyncEnabled() const
+{
+    return m_settings.value(Key::ClipboardSync, true).toBool();
+}
+
+void AppSettings::setClipboardSyncEnabled(bool enabled)
+{
+    m_settings.setValue(Key::ClipboardSync, enabled);
+}
+
+QStringList AppSettings::recentConnections() const
+{
+    return m_settings.value(Key::Recent).toStringList();
+}
+
+void AppSettings::addRecentConnection(const QString &deviceId)
+{
+    QStringList recent = recentConnections();
+    recent.removeAll(deviceId);
+    recent.prepend(deviceId);
+    while (recent.size() > kMaxRecentConnections)
+        recent.removeLast();
+    m_settings.setValue(Key::Recent, recent);
+}
+
+} // namespace anypc

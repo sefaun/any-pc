@@ -82,6 +82,7 @@ int main(int argc, char *argv[])
             }
         }
     });
-    application.start();
+    if (!application.start())
+        return 0;
     return app.exec();
 }

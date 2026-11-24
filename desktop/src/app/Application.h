@@ -25,7 +25,8 @@ public:
     explicit Application(QObject *parent = nullptr);
     ~Application() override;
 
-    void start();
+    /** Shows the main window and connects. Returns false if the user aborted first-run setup. */
+    bool start();
 
 private:
     void authenticate();

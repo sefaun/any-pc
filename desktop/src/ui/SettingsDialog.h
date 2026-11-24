@@ -1,6 +1,7 @@
 #pragma once
 
 #include <QDialog>
+#include <QUrl>
 
 class QCheckBox;
 class QLineEdit;
@@ -25,6 +26,7 @@ private:
 
     AppSettings *m_settings;
     QLineEdit *m_serverUrl;
+    QUrl m_pendingServerUrl;
     QLineEdit *m_deviceName;
     QLineEdit *m_password;
     QLineEdit *m_passwordConfirm;

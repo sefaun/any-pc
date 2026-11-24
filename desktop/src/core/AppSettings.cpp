@@ -27,18 +27,49 @@ AppSettings::AppSettings(QObject *parent)
 {
 }
 
+bool AppSettings::hasServerUrl() const
+{
+    return serverUrl().isValid();
+}
+
 QUrl AppSettings::serverUrl() const
 {
-    const QUrl url(m_settings.value(Key::ServerUrl, QString::fromLatin1(build::kDefaultServerUrl)).toString());
-    return url.isValid() ? url : QUrl(QString::fromLatin1(build::kDefaultServerUrl));
+    const QUrl url(m_settings.value(Key::ServerUrl).toString());
+    const bool usable = url.isValid() && !url.host().isEmpty()
+                        && (url.scheme() == QLatin1String("http") || url.scheme() == QLatin1String("https"));
+    return usable ? url : QUrl();
 }
 
 void AppSettings::setServerUrl(const QUrl &url)
 {
-    if (url == serverUrl())
+    const QUrl normalized = url.adjusted(QUrl::StripTrailingSlash);
+    if (m_settings.contains(Key::ServerUrl) && normalized == serverUrl())
         return;
-    m_settings.setValue(Key::ServerUrl, url.toString(QUrl::StripTrailingSlash));
-    Q_EMIT serverUrlChanged(url);
+    m_settings.setValue(Key::ServerUrl, normalized.toString());
+    m_settings.sync();
+    Q_EMIT serverUrlChanged(normalized);
+}
+
+QUrl AppSettings::suggestedServerUrl()
+{
+    return normalizeServerUrl(QString::fromLatin1(build::kDefaultServerUrl));
+}
+
+QUrl AppSettings::normalizeServerUrl(const QString &input)
+{
+    QString text = input.trimmed();
+    if (text.isEmpty())
+        return {};
+    if (!text.contains(QLatin1String("://")))
+        text.prepend(QLatin1String("https://"));
+    QUrl url(text, QUrl::StrictMode);
+    if (!url.isValid() || url.host().isEmpty()
+        || (url.scheme() != QLatin1String("http") && url.scheme() != QLatin1String("https")))
+        return {};
+    // Only scheme, host, port and an optional base path are meaningful.
+    url.setQuery(QString());
+    url.setFragment(QString());
+    return url.adjusted(QUrl::StripTrailingSlash);
 }
 
 QString AppSettings::deviceName() const

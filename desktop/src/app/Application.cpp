@@ -6,8 +6,10 @@
 #include "network/SignalingClient.h"
 #include "session/SessionManager.h"
 #include "ui/MainWindow.h"
+#include "ui/ServerSetupDialog.h"
 
 #include <QJsonObject>
+#include <QSignalBlocker>
 #include <QLoggingCategory>
 
 #include <algorithm>
@@ -70,11 +72,20 @@ Application::~Application()
     m_signaling->disconnectFromServer();
 }
 
-void Application::start()
+bool Application::start()
 {
+    if (!m_settings->hasServerUrl()) {
+        // First launch: the server is chosen at runtime instead of at build time.
+        ServerSetupDialog setup(AppSettings::suggestedServerUrl());
+        if (setup.exec() != QDialog::Accepted)
+            return false;
+        QSignalBlocker blocker(m_settings);
+        m_settings->setServerUrl(setup.serverUrl());
+    }
     m_api->setBaseUrl(m_settings->serverUrl());
     m_window->show();
     authenticate();
+    return true;
 }
 
 void Application::onServerUrlChanged()

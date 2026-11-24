@@ -169,7 +169,7 @@ Her release'te şu dosyalar yayınlanır:
 | macOS 12+ (Apple Silicon + Intel) | `AnyPC-<sürüm>-macOS.dmg` |
 | Linux x86_64 (X11) | `AnyPC-<sürüm>-x86_64.AppImage` |
 
-Varsayılan sunucu adresi derleme sırasında gömülür (CI'da `ANYPC_SERVER_URL` repo değişkeni). Kullanıcı bunu **File → Settings** üzerinden değiştirebilir.
+**Sunucu adresi build'e gömülmez.** Uygulama ilk açıldığında sunucu adresini sorar (ör. `anypc.example.com`; şema yazılmazsa `https` kabul edilir), `/api/v1/health` ile doğrular ve kaydeder. Sonradan **File → Settings → Server → Change…** ile değiştirilebilir. Aynı kurulum dosyası farklı sunucularla kullanılabilir.
 
 ### Kullanım
 
@@ -194,7 +194,7 @@ Varsayılan sunucu adresi derleme sırasında gömülür (CI'da `ANYPC_SERVER_UR
 Gereksinimler: CMake ≥ 3.21, C++17 derleyici, Qt ≥ 6.4 (release'ler 6.8 LTS ile derlenir). Gerekli Qt modülleri: WebEngine, WebChannel, WebSockets, Positioning. Linux'ta ayrıca `libxtst-dev`.
 
 ```bash
-cmake -S desktop -B build -DCMAKE_BUILD_TYPE=Release -DANYPC_DEFAULT_SERVER_URL=https://anypc.example.com
+cmake -S desktop -B build -DCMAKE_BUILD_TYPE=Release
 cmake --build build --parallel
 ```
 
@@ -230,6 +230,6 @@ Alternatif olarak GitHub'da **Actions → Release → Run workflow** ile sürüm
 
 İsteğe bağlı repo değişkeni (**Settings → Secrets and variables → Actions → Variables**):
 
-- `ANYPC_SERVER_URL`: istemcilere gömülecek backend adresi (ör. `https://anypc.example.com`).
+- `ANYPC_SERVER_URL`: ilk açılıştaki sunucu ekranında önerilecek adres (ör. `https://anypc.example.com`). Zorunlu değildir; kullanıcı adresi her durumda kendisi onaylar.
 
 `ci.yml`, `main`'e yapılan her push'ta ve her PR'da backend testlerini, Docker build'ini ve Linux istemci build'ini çalıştırır.

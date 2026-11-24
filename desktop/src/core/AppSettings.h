@@ -20,8 +20,15 @@ class AppSettings final : public QObject
 public:
     explicit AppSettings(QObject *parent = nullptr);
 
+    /** True once the user has chosen a server (first-run setup completed). */
+    bool hasServerUrl() const;
+    /** Configured server, or an invalid QUrl when none has been chosen yet. */
     QUrl serverUrl() const;
     void setServerUrl(const QUrl &url);
+    /** Optional build-time suggestion used to pre-fill the first-run dialog. */
+    static QUrl suggestedServerUrl();
+    /** Turns user input ("anypc.example.com") into a server URL (https by default). */
+    static QUrl normalizeServerUrl(const QString &input);
 
     QString deviceName() const;
     void setDeviceName(const QString &name);

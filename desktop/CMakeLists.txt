@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.21)
 
 # Version is injected by CI from the git tag (e.g. -DANYPC_VERSION=1.2.3).
 set(ANYPC_VERSION "0.1.0" CACHE STRING "Application version (MAJOR.MINOR.PATCH)")
-set(ANYPC_DEFAULT_SERVER_URL "http://localhost:3000" CACHE STRING "Default backend URL baked into the client")
+set(ANYPC_DEFAULT_SERVER_URL "" CACHE STRING "Optional backend URL suggested on first launch (users always confirm it)")
 
 project(AnyPC
     VERSION ${ANYPC_VERSION}
@@ -51,6 +51,7 @@ set(ANYPC_SOURCES
     src/ui/MainWindow.cpp              src/ui/MainWindow.h
     src/ui/IncomingRequestDialog.cpp   src/ui/IncomingRequestDialog.h
     src/ui/SettingsDialog.cpp          src/ui/SettingsDialog.h
+    src/ui/ServerSetupDialog.cpp       src/ui/ServerSetupDialog.h
     src/ui/ViewerWindow.cpp            src/ui/ViewerWindow.h
     src/ui/Theme.cpp                   src/ui/Theme.h
     resources/resources.qrc

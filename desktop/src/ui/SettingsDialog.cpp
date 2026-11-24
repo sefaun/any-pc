@@ -1,10 +1,13 @@
 #include "ui/SettingsDialog.h"
 
 #include "core/AppSettings.h"
+#include "ui/ServerSetupDialog.h"
 
 #include <QCheckBox>
 #include <QDialogButtonBox>
 #include <QFormLayout>
+#include <QHBoxLayout>
+#include <QPushButton>
 #include <QGroupBox>
 #include <QLabel>
 #include <QLineEdit>
@@ -32,7 +35,19 @@ SettingsDialog::SettingsDialog(AppSettings *settings, QWidget *parent)
     setWindowTitle(tr("Settings"));
     setMinimumWidth(480);
 
-    m_serverUrl->setPlaceholderText(QStringLiteral("https://anypc.example.com"));
+    m_pendingServerUrl = settings->serverUrl();
+    m_serverUrl->setReadOnly(true);
+    auto *changeServer = new QPushButton(tr("Change…"), this);
+    connect(changeServer, &QPushButton::clicked, this, [this]() {
+        ServerSetupDialog dialog(m_pendingServerUrl, this);
+        if (dialog.exec() == QDialog::Accepted) {
+            m_pendingServerUrl = dialog.serverUrl();
+            m_serverUrl->setText(m_pendingServerUrl.toString());
+        }
+    });
+    auto *serverRow = new QHBoxLayout;
+    serverRow->addWidget(m_serverUrl, 1);
+    serverRow->addWidget(changeServer);
     m_deviceName->setMaxLength(64);
     m_password->setEchoMode(QLineEdit::Password);
     m_passwordConfirm->setEchoMode(QLineEdit::Password);
@@ -42,7 +57,7 @@ SettingsDialog::SettingsDialog(AppSettings *settings, QWidget *parent)
 
     auto *general = new QGroupBox(tr("General"), this);
     auto *generalForm = new QFormLayout(general);
-    generalForm->addRow(tr("Server URL"), m_serverUrl);
+    generalForm->addRow(tr("Server"), serverRow);
     generalForm->addRow(tr("Device name"), m_deviceName);
     generalForm->addRow(QString(), m_clipboardSync);
     generalForm->addRow(QString(), m_minimizeToTray);
@@ -83,11 +98,6 @@ void SettingsDialog::updatePasswordState()
 
 void SettingsDialog::accept()
 {
-    const QUrl url = QUrl::fromUserInput(m_serverUrl->text().trimmed());
-    if (!url.isValid() || (url.scheme() != QLatin1String("http") && url.scheme() != QLatin1String("https"))) {
-        QMessageBox::warning(this, windowTitle(), tr("Please enter a valid http(s) server URL."));
-        return;
-    }
     if (m_deviceName->text().trimmed().isEmpty()) {
         QMessageBox::warning(this, windowTitle(), tr("The device name cannot be empty."));
         return;
@@ -113,7 +123,8 @@ void SettingsDialog::accept()
         m_settings->clearUnattendedPassword();
     else if (!password.isEmpty())
         m_settings->setUnattendedPassword(password);
-    m_settings->setServerUrl(url.adjusted(QUrl::StripTrailingSlash));
+    if (m_pendingServerUrl.isValid())
+        m_settings->setServerUrl(m_pendingServerUrl);
     QDialog::accept();
 }
 

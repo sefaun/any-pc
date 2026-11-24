@@ -186,6 +186,9 @@ jobs:
   publish:
     name: Publish GitHub Release
     needs: [version, backend-image, desktop]
+    # Publish whatever desktop builds succeeded; a missing platform (e.g. no macOS
+    # runner available) must not block the others.
+    if: ${{ !cancelled() && needs.version.result == 'success' && needs.backend-image.result == 'success' }}
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -196,9 +199,31 @@ jobs:
           pattern: anypc-*
           merge-multiple: true
 
-      - name: Checksums
-        working-directory: artifacts
-        run: sha256sum * > SHA256SUMS.txt && cat SHA256SUMS.txt
+      - name: Prepare release notes
+        id: notes
+        env:
+          VERSION: ${{ needs.version.outputs.version }}
+          OWNER: ${{ github.repository_owner }}
+        run: |
+          shopt -s nullglob
+          files=(artifacts/*)
+          if [[ ${#files[@]} -eq 0 ]]; then echo "No desktop build succeeded" >&2; exit 1; fi
+          (cd artifacts && sha256sum * > SHA256SUMS.txt && cat SHA256SUMS.txt)
+          row() { [[ -f "artifacts/$2" ]] && echo "| $1 | \`$2\` |" || echo "| $1 | _not available in this release_ |"; }
+          {
+            echo "## Desktop"
+            echo "| Platform | File |"
+            echo "| --- | --- |"
+            row "Windows 10/11 (x64)" "AnyPC-Setup-${VERSION}-x64.exe"
+            row "macOS 12+ (Universal)" "AnyPC-${VERSION}-macOS.dmg"
+            row "Linux x86_64 (X11)" "AnyPC-${VERSION}-x86_64.AppImage"
+            echo
+            echo "## Backend"
+            echo '```bash'
+            echo "docker pull ghcr.io/${OWNER}/any-pc-backend:${VERSION}"
+            echo '```'
+          } > notes.md
+          cat notes.md
 
       - uses: softprops/action-gh-release@v2
         with:
@@ -208,15 +233,4 @@ jobs:
           files: artifacts/*
           prerelease: ${{ contains(needs.version.outputs.version, '-') }}
           generate_release_notes: true
-          body: |
-            ## Desktop
-            | Platform | File |
-            | --- | --- |
-            | Windows 10/11 (x64) | `AnyPC-Setup-${{ needs.version.outputs.version }}-x64.exe` |
-            | macOS 12+ (Universal) | `AnyPC-${{ needs.version.outputs.version }}-macOS.dmg` |
-            | Linux x86_64 (X11) | `AnyPC-${{ needs.version.outputs.version }}-x86_64.AppImage` |
-
-            ## Backend
-            ```bash
-            docker pull ghcr.io/${{ github.repository_owner }}/any-pc-backend:${{ needs.version.outputs.version }}
-            ```
+          body_path: notes.md

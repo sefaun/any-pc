@@ -21,7 +21,7 @@ concurrency:
 
 env:
   QT_VERSION: '6.8.3'
-  QT_MODULES: 'qtwebengine qtwebchannel qtwebsockets qtpositioning'
+  QT_MODULES: 'qtwebengine qtwebchannel qtwebsockets qtpositioning qtserialport'
 
 jobs:
   version:
@@ -107,7 +107,7 @@ jobs:
             os: windows-2022
             qt-arch: win64_msvc2022_64
           - name: macos
-            os: macos-14
+            os: macos-15
             qt-arch: clang_64
           - name: linux
             os: ubuntu-22.04

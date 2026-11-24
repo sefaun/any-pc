@@ -220,6 +220,8 @@ git tag v1.0.0
 git push origin v1.0.0
 ```
 
+Alternatif olarak GitHub'da **Actions → Release → Run workflow** ile sürüm numarası girerek de başlatılabilir; bu durumda `v<sürüm>` etiketi seçilen commit üzerinde otomatik oluşturulur.
+
 `.github/workflows/release.yml` şunları yapar:
 
 1. Backend için lint, typecheck ve testleri çalıştırır, ardından `linux/amd64` + `linux/arm64` Docker image'ını GHCR'ye gönderir: `ghcr.io/sefaun/any-pc-backend:1.0.0`, `:1.0` ve `:latest`. Image'a `org.opencontainers.image.source` etiketi eklendiği için repo sayfasında **Packages** altında görünür.

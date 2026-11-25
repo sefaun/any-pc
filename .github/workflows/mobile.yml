@@ -5,8 +5,10 @@ name: Mobile
 #   - iOS: unsigned IPA (sign it with your own Apple ID, e.g. Sideloadly/AltStore,
 #     or configure signing secrets for TestFlight)
 #
-# Releases are tagged mobile-v<version> (version from mobile/pubspec.yaml, a
-# mobile-v* tag or the manual input) and never replace the desktop "Latest" release.
+# Pushes to main/mobile only build and test. A separate mobile release, tagged
+# mobile-v<version>, is published for mobile-v* tags and manual runs (version from
+# the tag, the manual input or mobile/pubspec.yaml) and never replaces the
+# desktop "Latest" release.
 #
 # The Release workflow (release.yml) also calls this workflow for v* tags; the
 # APK/AAB/IPA are then attached to that release and the separate mobile release
@@ -168,9 +170,10 @@ jobs:
   publish:
     name: Publish release
     needs: [test, android, ios]
-    # Publish whatever platform builds succeeded (never on pull requests). When
-    # called from the Release workflow, that workflow publishes the files instead.
-    if: ${{ !cancelled() && github.workflow == 'Mobile' && github.event_name != 'pull_request' && needs.test.result == 'success' && (needs.android.result == 'success' || needs.ios.result == 'success') }}
+    # A standalone mobile release is only made for mobile-v* tags and manual runs.
+    # Branch pushes just build and test; v* releases (release.yml) attach the
+    # mobile files to the main release instead.
+    if: ${{ !cancelled() && github.workflow == 'Mobile' && (github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/mobile-v')) && needs.test.result == 'success' && (needs.android.result == 'success' || needs.ios.result == 'success') }}
     runs-on: ubuntu-latest
     permissions:
       contents: write

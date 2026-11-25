@@ -67,11 +67,10 @@ flutter test
 
 1. `main` ve `mobile` dallarına her push'ta (ve `mobile-v*` etiketlerinde) analiz ve testleri çalıştırır.
 2. Android APK ve AAB ile imzasız iOS IPA derler.
-3. `mobile-v<sürüm>` etiketiyle bir GitHub Release oluşturur. Sürüm `pubspec.yaml`'dan alınır; aynı sürüm tekrar derlenirse release güncellenir. Mobil release'ler masaüstünün "Latest" işaretini değiştirmez.
+3. Yalnızca `mobile-v*` etiketlerinde veya elle çalıştırıldığında (**Actions → Mobile → Run workflow**) `mobile-v<sürüm>` etiketiyle ayrı bir GitHub Release oluşturur. Sürüm etiketten, elle girilen değerden ya da `pubspec.yaml`'dan alınır; aynı sürüm tekrar derlenirse release güncellenir. Mobil release'ler masaüstünün "Latest" işaretini değiştirmez. Dal push'larında sadece derleme ve test yapılır.
 
 Ana `v<sürüm>` release'i (`release.yml`) bu workflow'u çağırır; APK, AAB ve IPA dosyaları masaüstü kurulum dosyalarıyla birlikte aynı release'e eklenir.
 
-Yeni sürüm için `pubspec.yaml`'daki `version` değerini artırıp push'lamak yeterli.
 
 ### Android imzalama (isteğe bağlı)
 

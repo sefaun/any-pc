@@ -69,6 +69,8 @@ protected:
     virtual void pointerButton(MouseButton button, bool pressed, const QPointF &nativePos) = 0;
     virtual void wheel(double dxPixels, double dyPixels) = 0;
     virtual void key(const PlatformKey &key, bool pressed) = 0;
+    /** Types Unicode text independently of the local keyboard layout. */
+    virtual void typeText(const QString &text) = 0;
 
     /** Maps normalised [0,1] coordinates into the selected native area. */
     QPointF toNative(const QPointF &normalized) const;

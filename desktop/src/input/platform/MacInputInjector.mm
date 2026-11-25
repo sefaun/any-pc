@@ -163,6 +163,26 @@ protected:
         post(event);
     }
 
+    void typeText(const QString &text) override
+    {
+        for (const QChar ch : text) {
+            if (ch == QLatin1Char('\n') || ch == QLatin1Char('\r')) {
+                post(CGEventCreateKeyboardEvent(m_source, kVK_Return, true));
+                post(CGEventCreateKeyboardEvent(m_source, kVK_Return, false));
+                continue;
+            }
+            const UniChar unit = ch.unicode();
+            for (const bool down : {true, false}) {
+                CGEventRef event = CGEventCreateKeyboardEvent(m_source, 0, down);
+                if (!event)
+                    continue;
+                CGEventSetFlags(event, 0);
+                CGEventKeyboardSetUnicodeString(event, 1, &unit);
+                post(event);
+            }
+        }
+    }
+
 private:
     static CGEventFlags modifierFlag(CGKeyCode code)
     {

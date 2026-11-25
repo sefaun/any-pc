@@ -57,6 +57,13 @@ std::optional<InputEvent> InputEvent::fromJson(const QJsonObject &json)
             return std::nullopt;
         return event;
     }
+    if (type == QLatin1String("tx")) {
+        event.type = Type::Text;
+        event.text = json.value(QLatin1String("s")).toString().left(kMaxTextLength);
+        if (event.text.isEmpty())
+            return std::nullopt;
+        return event;
+    }
     return std::nullopt;
 }
 

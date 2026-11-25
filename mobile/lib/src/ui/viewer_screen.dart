@@ -44,17 +44,35 @@ class _ViewerScreenState extends State<ViewerScreen> {
   void _onConnectionChanged() {
     if (!mounted) return;
     if (_connection.state == ViewerState.closed || _connection.state == ViewerState.failed) {
-      _close(alreadyEnded: true);
+      _leave();
       return;
     }
     setState(() {});
   }
 
-  Future<void> _close({bool alreadyEnded = false}) async {
+  /// Ends the session at the user's request and leaves the screen right away;
+  /// the connection is torn down in the background.
+  Future<void> _close() async {
     if (_closing) return;
-    _closing = true;
-    if (!alreadyEnded) await AppScope.read(context).endSession(byUser: true);
-    if (mounted) Navigator.of(context).maybePop();
+    final controller = AppScope.read(context);
+    _leave();
+    await controller.endSession(byUser: true);
+  }
+
+  /// Removes this screen (and any dialog or sheet opened on top of it).
+  ///
+  /// Uses pop() rather than maybePop(): the PopScope below blocks maybePop()
+  /// while a session is active, which used to leave this screen open after a
+  /// failed connection or a confirmed Disconnect.
+  void _leave() {
+    if (!mounted) return;
+    _keyboardFocus.unfocus();
+    if (!_closing) setState(() => _closing = true);
+    final route = ModalRoute.of(context);
+    final navigator = Navigator.of(context);
+    if (route == null || !route.isActive) return;
+    if (!route.isCurrent) navigator.popUntil((r) => r == route);
+    navigator.pop();
   }
 
   @override

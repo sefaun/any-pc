@@ -181,9 +181,7 @@
       const sfu = new SfuSession(this.api, this.config.connectionId, this.pc);
       await sfu.create();
       this.log.info('Subscribing to the host screen');
-      const tracks = [{ location: 'remote', trackName: info.trackName, kind: 'video' }];
-      if (info.audioTrackName) tracks.push({ location: 'remote', trackName: info.audioTrackName, kind: 'audio' });
-      await sfu.subscribeTracks(tracks);
+      await sfu.subscribeTracks([{ location: 'remote', trackName: info.trackName, kind: 'video' }]);
       await waitForConnection(this.pc);
       this.log.info('Media connected; opening control channel');
 
@@ -207,6 +205,16 @@
         this.bridge.reportState('connected', '');
       });
       this.channel.addEventListener('close', () => this.input.setEnabled(false));
+
+      // Sound is optional: subscribed last so that a problem with it can never
+      // prevent the screen and controls from working.
+      if (info.audioTrackName) {
+        try {
+          await sfu.subscribeTracks([{ location: 'remote', trackName: info.audioTrackName, kind: 'audio' }]);
+        } catch (error) {
+          this.log.warn('The remote sound is not available', error);
+        }
+      }
     }
 
     onControlMessage(data) {

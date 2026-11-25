@@ -91,7 +91,6 @@ class ViewerConnection extends ChangeNotifier implements RemoteInputSink {
     final audioName = info['audioTrackName'] as String?;
     inputSupported = info['inputSupported'] != false;
 
-    if (audioName != null) await _configureAudioOutput();
     final ice = await api.get('/rtc/ice-servers');
     final pc = await createPeerConnection({
       'iceServers': ice['iceServers'] ?? const [],
@@ -129,7 +128,6 @@ class ViewerConnection extends ChangeNotifier implements RemoteInputSink {
     await sfu.create();
     await sfu.subscribeTracks([
       {'location': 'remote', 'trackName': trackName, 'kind': 'video'},
-      if (audioName != null) {'location': 'remote', 'trackName': audioName, 'kind': 'audio'},
     ]);
     await sfu.waitForConnection();
     await sfu.establishDataChannels();
@@ -174,6 +172,21 @@ class ViewerConnection extends ChangeNotifier implements RemoteInputSink {
       if (s == RTCDataChannelState.RTCDataChannelClosed && state == ViewerState.connected) _fail('Connection closed');
     };
     if (control.state == RTCDataChannelState.RTCDataChannelOpen) _onControlOpen();
+
+    // Sound is optional: subscribed last so that a problem with it can never
+    // prevent the screen and controls from working.
+    if (audioName != null) await _subscribeAudio(sfu, audioName);
+  }
+
+  Future<void> _subscribeAudio(SfuSession sfu, String trackName) async {
+    try {
+      await _configureAudioOutput();
+      await sfu.subscribeTracks([
+        {'location': 'remote', 'trackName': trackName, 'kind': 'audio'},
+      ]);
+    } catch (e) {
+      debugPrint('The remote sound is not available: $e');
+    }
   }
 
   void _onControlOpen() {
@@ -299,11 +312,14 @@ class ViewerConnection extends ChangeNotifier implements RemoteInputSink {
     _control = null;
     _audioTrack = null;
     audioAvailable = false;
+    // Native teardown can stall after a failed connection; never block on it.
     try {
-      await pc?.close();
+      await pc?.close().timeout(const Duration(seconds: 5));
     } catch (_) {}
-    renderer.srcObject = null;
-    await renderer.dispose();
+    try {
+      renderer.srcObject = null;
+      await renderer.dispose().timeout(const Duration(seconds: 5));
+    } catch (_) {}
     notifyListeners();
   }
 }

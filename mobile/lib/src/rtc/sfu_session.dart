@@ -20,7 +20,7 @@ class SfuSession {
   SfuSession(this._api, String connectionId, this.pc) : _base = '/connections/$connectionId/rtc';
 
   static const iceGatheringTimeout = Duration(milliseconds: 2500);
-  static const connectionTimeout = Duration(seconds: 20);
+  static const connectionTimeout = Duration(seconds: 30);
 
   final ApiClient _api;
   final String _base;

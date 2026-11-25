@@ -14,7 +14,7 @@ import 'net/signaling_client.dart';
 import 'rtc/file_transfer.dart';
 import 'rtc/viewer_connection.dart';
 
-const String appVersion = String.fromEnvironment('APP_VERSION', defaultValue: '1.0.0');
+const String appVersion = String.fromEnvironment('APP_VERSION', defaultValue: '1.0.1');
 
 enum OutgoingState { idle, requesting, waiting }
 
@@ -249,9 +249,15 @@ class AppController extends ChangeNotifier {
         if (frame.str('requestId') != _requestId) return;
         _outgoingConnectionId = frame.str('connectionId');
         final target = DeviceSummary.fromJson(frame.data['target']);
+        _updateRecent(recent.updateDetails(target.id, name: target.name, platform: target.platform));
+        // Older servers do not refuse requests to phones themselves.
+        if (target.platform == 'android' || target.platform == 'ios') {
+          cancelOutgoing();
+          _messages.add(phoneTargetMessage);
+          return;
+        }
         outgoingTarget = target;
         outgoing = OutgoingState.waiting;
-        _updateRecent(recent.updateDetails(target.id, name: target.name, platform: target.platform));
       case ServerEvent.connectionAccepted:
         if (frame.str('role') != 'viewer' || frame.str('connectionId') != _outgoingConnectionId) return;
         final peer = DeviceSummary.fromJson(frame.data['peer']);
@@ -288,12 +294,16 @@ class AppController extends ChangeNotifier {
           _messages.add(switch (frame.str('code')) {
             'DEVICE_NOT_FOUND' => 'No device with this address exists.',
             'DEVICE_OFFLINE' => 'The remote device is offline.',
+            'DEVICE_NOT_CONTROLLABLE' => phoneTargetMessage,
             _ => frame.str('message'),
           });
         }
     }
     notifyListeners();
   }
+
+  static const phoneTargetMessage =
+      'This address belongs to a phone. Phones cannot be controlled remotely; connect to a computer instead.';
 
   static String _describeEnd(String reason) => switch (reason) {
         'hangup' => 'The remote side ended the session.',

@@ -100,6 +100,12 @@ void SessionManager::clearOutgoing()
         Q_EMIT outgoingFinished();
 }
 
+QString SessionManager::phoneTargetMessage()
+{
+    return tr("This address belongs to a phone. Phones cannot be controlled remotely; open AnyPC on the "
+              "phone and connect to this computer from there.");
+}
+
 void SessionManager::onPending(const QString &requestId, const QString &connectionId,
                                const protocol::DeviceSummary &target)
 {
@@ -107,6 +113,12 @@ void SessionManager::onPending(const QString &requestId, const QString &connecti
         return;
     m_outgoingConnectionId = connectionId;
     m_settings->recentConnections()->updateDetails(target.id, target.name, target.platform);
+    // Older servers do not refuse requests to phones themselves.
+    if (target.platform == QLatin1String("android") || target.platform == QLatin1String("ios")) {
+        cancelOutgoing();
+        Q_EMIT notification(phoneTargetMessage());
+        return;
+    }
     Q_EMIT outgoingPending(target);
 }
 
@@ -118,6 +130,8 @@ void SessionManager::onServerError(const QString &requestId, const QString &code
             Q_EMIT notification(tr("No device with this ID exists."));
         else if (code == QLatin1String("DEVICE_OFFLINE"))
             Q_EMIT notification(tr("The remote device is offline."));
+        else if (code == QLatin1String("DEVICE_NOT_CONTROLLABLE"))
+            Q_EMIT notification(phoneTargetMessage());
         else
             Q_EMIT notification(message);
         return;

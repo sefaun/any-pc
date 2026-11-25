@@ -1,6 +1,13 @@
 export const DEVICE_PLATFORMS = ['windows', 'macos', 'linux', 'android', 'ios', 'unknown'] as const;
 export type DevicePlatform = (typeof DEVICE_PLATFORMS)[number];
 
+/** Phones run the viewer only: they can control computers but cannot be controlled. */
+const VIEWER_ONLY_PLATFORMS: readonly DevicePlatform[] = ['android', 'ios'];
+
+export function canBeControlled(platform: DevicePlatform): boolean {
+  return !VIEWER_ONLY_PLATFORMS.includes(platform);
+}
+
 export const DEVICE_ID_LENGTH = 9;
 export const DEVICE_ID_PATTERN = /^[1-9]\d{8}$/;
 

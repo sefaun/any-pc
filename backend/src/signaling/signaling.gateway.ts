@@ -23,7 +23,7 @@ import type {
   ConnectionEvent,
 } from '../connections/connection.entity';
 import { ConnectionsService } from '../connections/connections.service';
-import { toDeviceSummary, type DeviceRecord } from '../devices/device.entity';
+import { canBeControlled, toDeviceSummary, type DeviceRecord } from '../devices/device.entity';
 import { DevicesService } from '../devices/devices.service';
 import {
   ConnectionEndDto,
@@ -113,6 +113,13 @@ export class SignalingGateway
       if (!host) throw new AppError('DEVICE_NOT_FOUND', 'No device with this ID exists', 404);
       if (!this.presence.isOnline(host.id)) {
         throw new AppError('DEVICE_OFFLINE', 'The remote device is offline', 409);
+      }
+      if (!canBeControlled(host.platform)) {
+        throw new AppError(
+          'DEVICE_NOT_CONTROLLABLE',
+          'This device is a phone and cannot be controlled remotely. Connect from the phone to the computer instead.',
+          409,
+        );
       }
 
       const connection = this.connections.request(viewer.id, host.id);

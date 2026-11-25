@@ -61,6 +61,7 @@ private:
     void onIncoming(const QString &connectionId, const protocol::DeviceSummary &from, const QString &password,
                     int expiresInMs);
     void onPending(const QString &requestId, const QString &connectionId, const protocol::DeviceSummary &target);
+    static QString phoneTargetMessage();
     void onAccepted(const QString &connectionId, protocol::Role role, const protocol::DeviceSummary &peer);
     void onRejected(const QString &connectionId, const QString &reason);
     void onEnded(const QString &connectionId, const QString &reason);

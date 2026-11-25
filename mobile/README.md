@@ -6,6 +6,7 @@ Flutter ile yazılmış Android ve iOS istemcisi. Telefondan, AnyPC masaüstü u
 
 - İlk açılışta sunucu adresi sorulur ve `/api/v1/health` ile doğrulanır.
 - 9 haneli adresle bağlanma, gözetimsiz erişim şifresi desteği.
+- **Karekod (QR)**: Adres alanındaki tarama düğmesiyle kamera açılır; masaüstü uygulamasındaki karekod okutulunca adres otomatik yazılır. Telefonun kendi adresi de karekod olarak gösterilebilir (menü → *My QR code* veya ana ekrandaki "This phone" satırı); kayıtlı bilgisayarların karekodu da uzun basma menüsünden açılır. Karekod içeriği `anypc://connect?id=<adres>` biçimindedir.
 - **Recent sessions**: Daha önce bağlanılan bilgisayarlar listelenir. Dokununca bağlanır; uzun basınca yeniden adlandır, adresi kopyala ve sil seçenekleri çıkar. Liste sadece telefonda saklanır.
 - Uzak ekran: Cloudflare SFU üzerinden WebRTC video.
 - Dokunmatik kontrol:
@@ -67,6 +68,8 @@ flutter test
 1. `main` ve `mobile` dallarına her push'ta (ve `mobile-v*` etiketlerinde) analiz ve testleri çalıştırır.
 2. Android APK ve AAB ile imzasız iOS IPA derler.
 3. `mobile-v<sürüm>` etiketiyle bir GitHub Release oluşturur. Sürüm `pubspec.yaml`'dan alınır; aynı sürüm tekrar derlenirse release güncellenir. Mobil release'ler masaüstünün "Latest" işaretini değiştirmez.
+
+Ana `v<sürüm>` release'i (`release.yml`) bu workflow'u çağırır; APK, AAB ve IPA dosyaları masaüstü kurulum dosyalarıyla birlikte aynı release'e eklenir.
 
 Yeni sürüm için `pubspec.yaml`'daki `version` değerini artırıp push'lamak yeterli.
 

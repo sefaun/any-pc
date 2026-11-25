@@ -29,4 +29,9 @@ QString format(const QString &normalized)
            + normalized.mid(6, 3);
 }
 
+QString qrPayload(const QString &normalized)
+{
+    return QStringLiteral("anypc://connect?id=") + normalized;
+}
+
 } // namespace anypc::DeviceId

@@ -65,7 +65,12 @@ set(ANYPC_LIB_SOURCES
     src/ui/ScreenBorderOverlay.cpp     src/ui/ScreenBorderOverlay.h
     src/ui/RecentConnectionsView.cpp   src/ui/RecentConnectionsView.h
     src/ui/Theme.cpp                   src/ui/Theme.h
+    src/ui/QrCodeWidget.cpp            src/ui/QrCodeWidget.h
 )
+
+# Third party code is compiled without the project's warning flags.
+add_library(anypc_qrcodegen STATIC src/third_party/qrcodegen/qrcodegen.cpp src/third_party/qrcodegen/qrcodegen.hpp)
+set_target_properties(anypc_qrcodegen PROPERTIES AUTOMOC OFF)
 
 if(WIN32)
     list(APPEND ANYPC_LIB_SOURCES src/input/platform/WindowsInputInjector.cpp)
@@ -87,6 +92,7 @@ else()
     target_compile_options(anypc_lib PUBLIC -Wall -Wextra -Wpedantic)
 endif()
 target_link_libraries(anypc_lib PUBLIC
+    anypc_qrcodegen
     Qt6::Core Qt6::Gui Qt6::Widgets Qt6::Network Qt6::WebSockets
     Qt6::WebChannel Qt6::WebEngineCore Qt6::WebEngineWidgets)
 

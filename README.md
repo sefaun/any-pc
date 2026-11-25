@@ -169,12 +169,14 @@ Her release'te şu dosyalar yayınlanır:
 | Windows 10/11 x64 | `AnyPC-Setup-<sürüm>-x64.exe` (Inno Setup; isteğe bağlı masaüstü kısayolu ve oturum açılışında başlatma) |
 | macOS 12+ (Apple Silicon + Intel) | `AnyPC-<sürüm>-macOS.dmg` |
 | Linux x86_64 (X11) | `AnyPC-<sürüm>-x86_64.AppImage` |
+| Android | `AnyPC-Mobile-<sürüm>-android.apk` (doğrudan kurulum) ve `.aab` (Google Play) |
+| iOS | `AnyPC-Mobile-<sürüm>-ios-unsigned.ipa` (imzasız; Sideloadly/AltStore ile kendi Apple ID'nizle imzalayın) |
 
 **Sunucu adresi build'e gömülmez.** Uygulama ilk açıldığında sunucu adresini sorar (ör. `anypc.example.com`; şema yazılmazsa `https` kabul edilir), `/api/v1/health` ile doğrular ve kaydeder. Sonradan **File → Settings → Server → Change…** ile değiştirilebilir. Aynı kurulum dosyası farklı sunucularla kullanılabilir.
 
 ### Kullanım
 
-- **This computer**: cihazın adresi. Kopyalayıp karşı tarafa iletin.
+- **This computer**: cihazın adresi. Kopyalayıp karşı tarafa iletin. Yanındaki karekod mobil uygulamayla okutulabilir; tıklayınca (veya *Enlarge*) büyük hâli açılır.
 - **Remote computer**: bağlanılacak adresi yazıp **Connect**'e basın. Karşı tarafta gözetimsiz erişim açıksa şifreyi de yazın.
 - **Recent sessions**: Daha önce bağlanılan bilgisayarlar kutucuk olarak listelenir (cihaz adı, adres, platform rengi, son bağlantı zamanı). Çift tıklayınca bağlanır; sağ tık menüsünde *Connect*, *Copy address*, *Rename…* ve *Remove from list* vardır. Liste yalnızca bu bilgisayarda saklanır; sunucuya gönderilmez ve şifre tutulmaz.
 - **Gözetimsiz erişim**: *Configure unattended access…* ile şifre belirleyin. Şifre cihazda PBKDF2-SHA256 ile hash'lenmiş olarak saklanır ve doğrulama host tarafında yapılır. Yanlış şifreyle gelen istek otomatik reddedilir.
@@ -243,7 +245,8 @@ Alternatif olarak GitHub'da **Actions → Release → Run workflow** ile sürüm
 
 1. Backend için lint, typecheck ve testleri çalıştırır, ardından `linux/amd64` + `linux/arm64` Docker image'ını GHCR'ye gönderir: `ghcr.io/sefaun/any-pc-backend:1.0.0`, `:1.0` ve `:latest`. Image'a `org.opencontainers.image.source` etiketi eklendiği için repo sayfasında **Packages** altında görünür.
 2. Qt 6.8 ile Windows, macOS ve Linux istemcilerini derleyip paketler.
-3. Kurulum dosyalarını ve `SHA256SUMS.txt`'yi etikete ait GitHub Release'e ekler. `-rc` gibi ön ek taşıyan sürümler prerelease olarak işaretlenir.
+3. `mobile.yml`'yi çağırarak Android (APK/AAB) ve iOS (imzasız IPA) uygulamalarını aynı sürüm numarasıyla derler.
+4. Kurulum dosyalarını ve `SHA256SUMS.txt`'yi etikete ait GitHub Release'e ekler. `-rc` gibi ön ek taşıyan sürümler prerelease olarak işaretlenir.
 
 İsteğe bağlı repo değişkeni (**Settings → Secrets and variables → Actions → Variables**):
 

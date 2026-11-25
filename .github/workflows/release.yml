@@ -4,7 +4,8 @@ name: Release
 # version) builds and publishes:
 #   - the backend Docker image to GitHub Container Registry (repository "Packages")
 #   - Windows (.exe installer), macOS (.dmg) and Linux (.AppImage) desktop builds,
-#     attached to a GitHub Release for the tag.
+#   - Android (.apk/.aab) and iOS (unsigned .ipa) mobile builds (mobile.yml),
+#     all attached to a GitHub Release for the tag.
 on:
   push:
     tags: ['v*']
@@ -186,11 +187,22 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
+  mobile:
+    name: Mobile
+    needs: version
+    uses: ./.github/workflows/mobile.yml
+    permissions:
+      contents: write
+    with:
+      version: ${{ needs.version.outputs.version }}
+    secrets: inherit
+
   publish:
     name: Publish GitHub Release
-    needs: [version, backend-image, desktop]
-    # Publish whatever desktop builds succeeded; a missing platform (e.g. no macOS
-    # runner available) or a failed image build must not block the installers.
+    needs: [version, backend-image, desktop, mobile]
+    # Publish whatever builds succeeded; a missing platform (e.g. no macOS runner
+    # available), a failed mobile build or a failed image build must not block
+    # the other installers.
     if: ${{ !cancelled() && needs.version.result == 'success' }}
     runs-on: ubuntu-latest
     permissions:
@@ -210,7 +222,7 @@ jobs:
         run: |
           shopt -s nullglob
           files=(artifacts/*)
-          if [[ ${#files[@]} -eq 0 ]]; then echo "No desktop build succeeded" >&2; exit 1; fi
+          if [[ ${#files[@]} -eq 0 ]]; then echo "No build succeeded" >&2; exit 1; fi
           (cd artifacts && sha256sum * > SHA256SUMS.txt && cat SHA256SUMS.txt)
           row() { [[ -f "artifacts/$2" ]] && echo "| $1 | \`$2\` |" || echo "| $1 | _not available in this release_ |"; }
           {
@@ -220,6 +232,16 @@ jobs:
             row "Windows 10/11 (x64)" "AnyPC-Setup-${VERSION}-x64.exe"
             row "macOS 12+ (Universal)" "AnyPC-${VERSION}-macOS.dmg"
             row "Linux x86_64 (X11)" "AnyPC-${VERSION}-x86_64.AppImage"
+            echo
+            echo "## Mobile"
+            echo "| Platform | File |"
+            echo "| --- | --- |"
+            row "Android (APK, install directly)" "AnyPC-Mobile-${VERSION}-android.apk"
+            row "Android (AAB, Google Play)" "AnyPC-Mobile-${VERSION}-android.aab"
+            row "iOS (unsigned IPA)" "AnyPC-Mobile-${VERSION}-ios-unsigned.ipa"
+            echo
+            echo "- **Android:** allow installing from unknown sources and open the APK."
+            echo "- **iOS:** the IPA is unsigned; sign and install it with your Apple ID (e.g. Sideloadly or AltStore)."
             echo
             echo "## Backend"
             echo '```bash'

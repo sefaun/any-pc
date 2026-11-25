@@ -12,6 +12,17 @@ void main() {
       expect(DeviceId.isValid('48291350'), isFalse);
       expect(DeviceId.format('482913507'), '482 913 507');
     });
+
+    test('QR payload round trip', () {
+      final payload = DeviceId.qrPayload('482913507');
+      expect(payload, 'anypc://connect?id=482913507');
+      expect(DeviceId.fromQrPayload(payload), '482913507');
+      expect(DeviceId.fromQrPayload(' ANYPC://connect?id=482%20913%20507 '), '482913507');
+      expect(DeviceId.fromQrPayload('482 913 507'), '482913507');
+      expect(DeviceId.fromQrPayload('anypc://connect?id=082913507'), isNull);
+      expect(DeviceId.fromQrPayload('https://example.com/?id=482913507'), isNull);
+      expect(DeviceId.fromQrPayload('hello'), isNull);
+    });
   });
 
   group('normalizeServerUrl', () {

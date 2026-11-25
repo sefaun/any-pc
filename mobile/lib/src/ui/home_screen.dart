@@ -9,6 +9,8 @@ import '../core/recent_connections.dart';
 import '../net/signaling_client.dart';
 import '../rtc/viewer_connection.dart';
 import 'app_scope.dart';
+import 'device_qr_sheet.dart';
+import 'qr_scanner_screen.dart';
 import 'setup_screen.dart';
 import 'theme.dart';
 import 'viewer_screen.dart';
@@ -72,6 +74,14 @@ class _HomeScreenState extends State<HomeScreen> {
     _password.clear();
   }
 
+  Future<void> _scanQr() async {
+    FocusScope.of(context).unfocus();
+    final id = await QrScannerScreen.scan(context);
+    if (id == null || !mounted) return;
+    _address.text = DeviceId.format(id);
+    _showMessage('Address ${DeviceId.format(id)} scanned.');
+  }
+
   @override
   void dispose() {
     for (final s in _subscriptions) {
@@ -93,6 +103,7 @@ class _HomeScreenState extends State<HomeScreen> {
           PopupMenuButton<String>(
             onSelected: (value) => _onMenu(value, controller),
             itemBuilder: (context) => const [
+              PopupMenuItem(value: 'qr', child: Text('My QR code')),
               PopupMenuItem(value: 'server', child: Text('Change server')),
               PopupMenuItem(value: 'name', child: Text('Device name')),
               PopupMenuItem(value: 'about', child: Text('About')),
@@ -109,6 +120,7 @@ class _HomeScreenState extends State<HomeScreen> {
               password: _password,
               controller: controller,
               onConnect: () => _connect(),
+              onScan: _scanQr,
             ),
             const SizedBox(height: 12),
             _ThisDevice(controller: controller),
@@ -122,6 +134,13 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Future<void> _onMenu(String value, AppController controller) async {
     switch (value) {
+      case 'qr':
+        final id = controller.deviceId;
+        if (id == null) {
+          _showMessage('This phone has no address yet.');
+        } else {
+          await showDeviceQrSheet(context, deviceId: id, title: 'This phone');
+        }
       case 'server':
         await Navigator.of(context).push(
           MaterialPageRoute<void>(builder: (_) => SetupScreen(initial: controller.serverUrl, popOnSave: true)),
@@ -177,12 +196,19 @@ class _StatusDot extends StatelessWidget {
 }
 
 class _ConnectCard extends StatelessWidget {
-  const _ConnectCard({required this.address, required this.password, required this.controller, required this.onConnect});
+  const _ConnectCard({
+    required this.address,
+    required this.password,
+    required this.controller,
+    required this.onConnect,
+    required this.onScan,
+  });
 
   final TextEditingController address;
   final TextEditingController password;
   final AppController controller;
   final VoidCallback onConnect;
+  final VoidCallback onScan;
 
   @override
   Widget build(BuildContext context) {
@@ -197,7 +223,7 @@ class _ConnectCard extends StatelessWidget {
           children: [
             Text('Remote computer', style: theme.textTheme.titleMedium),
             const SizedBox(height: 4),
-            Text('Enter the address of the computer you want to control.',
+            Text('Enter the address of the computer you want to control, or scan its QR code.',
                 style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
             const SizedBox(height: 12),
             TextField(
@@ -206,7 +232,15 @@ class _ConnectCard extends StatelessWidget {
               keyboardType: TextInputType.number,
               inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[0-9 ]')), LengthLimitingTextInputFormatter(11)],
               style: theme.textTheme.titleLarge,
-              decoration: const InputDecoration(hintText: '123 456 789', prefixIcon: Icon(Icons.computer)),
+              decoration: InputDecoration(
+                hintText: '123 456 789',
+                prefixIcon: const Icon(Icons.computer),
+                suffixIcon: IconButton(
+                  tooltip: 'Scan QR code',
+                  icon: const Icon(Icons.qr_code_scanner),
+                  onPressed: busy ? null : onScan,
+                ),
+              ),
               onSubmitted: (_) => onConnect(),
             ),
             const SizedBox(height: 10),
@@ -253,12 +287,21 @@ class _ThisDevice extends StatelessWidget {
     final theme = Theme.of(context);
     final id = controller.deviceId;
     final error = controller.lastError;
-    return Text(
+    final text = Text(
       error != null
           ? 'Server: $error'
           : 'This phone: ${id == null ? '—' : DeviceId.format(id)} · ${controller.serverUrl?.host ?? ''}',
       style: theme.textTheme.bodySmall?.copyWith(color: error != null ? theme.colorScheme.error : theme.colorScheme.onSurfaceVariant),
       textAlign: TextAlign.center,
+    );
+    if (error != null || id == null) return text;
+    return Center(
+      child: TextButton.icon(
+        style: TextButton.styleFrom(foregroundColor: theme.colorScheme.onSurfaceVariant),
+        icon: const Icon(Icons.qr_code_2, size: 18),
+        label: text,
+        onPressed: () => showDeviceQrSheet(context, deviceId: id, title: 'This phone'),
+      ),
     );
   }
 }
@@ -317,6 +360,7 @@ class _RecentList extends StatelessWidget {
             ListTile(title: Text(entry.displayName), subtitle: Text(DeviceId.format(entry.id))),
             ListTile(leading: const Icon(Icons.link), title: const Text('Connect'), onTap: () => Navigator.pop(context, 'connect')),
             ListTile(leading: const Icon(Icons.copy), title: const Text('Copy address'), onTap: () => Navigator.pop(context, 'copy')),
+            ListTile(leading: const Icon(Icons.qr_code_2), title: const Text('Show QR code'), onTap: () => Navigator.pop(context, 'qr')),
             ListTile(leading: const Icon(Icons.edit), title: const Text('Rename'), onTap: () => Navigator.pop(context, 'rename')),
             ListTile(
               leading: const Icon(Icons.delete_outline),
@@ -334,6 +378,8 @@ class _RecentList extends StatelessWidget {
       case 'copy':
         await Clipboard.setData(ClipboardData(text: entry.id));
         onMessage('Address copied.');
+      case 'qr':
+        await showDeviceQrSheet(context, deviceId: entry.id, title: entry.displayName);
       case 'rename':
         final alias = await _askText(context, 'Rename', entry.alias, hint: entry.name.isEmpty ? null : entry.name);
         if (alias != null) controller.renameRecent(entry.id, alias);

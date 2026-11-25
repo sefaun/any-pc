@@ -1,6 +1,7 @@
 #include "core/AppSettings.h"
 #include "core/DeviceId.h"
 #include "core/PasswordHasher.h"
+#include "ui/QrCodeWidget.h"
 
 #include <QtTest>
 
@@ -18,6 +19,22 @@ private Q_SLOTS:
         QVERIFY(DeviceId::isValid(QStringLiteral("482913507")));
         QVERIFY(!DeviceId::isValid(QStringLiteral("082913507")));
         QVERIFY(!DeviceId::isValid(QStringLiteral("48291350")));
+    }
+
+    void deviceIdQrCode()
+    {
+        const QString payload = DeviceId::qrPayload(QStringLiteral("482913507"));
+        QCOMPARE(payload, QStringLiteral("anypc://connect?id=482913507"));
+
+        const QImage image = QrCodeWidget::render(payload);
+        QVERIFY(!image.isNull());
+        // 27 bytes need a version 3 code at medium error correction (29 modules) plus a 4 module quiet zone.
+        QCOMPARE(image.width(), 29 + 8);
+        QCOMPARE(image.height(), image.width());
+        // Top-left finder pattern: dark corner inside the quiet zone, light quiet zone around it.
+        QCOMPARE(image.pixelIndex(4, 4), 1);
+        QCOMPARE(image.pixelIndex(0, 0), 0);
+        QVERIFY(QrCodeWidget::render(QString()).isNull());
     }
 
     void serverUrlNormalization_data()

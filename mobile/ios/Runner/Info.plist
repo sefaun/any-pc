@@ -17,7 +17,7 @@
 	<key>CFBundleName</key>
 	<string>AnyPC</string>
 	<key>NSCameraUsageDescription</key>
-	<string>AnyPC does not use the camera. The permission is declared by the WebRTC library.</string>
+	<string>AnyPC uses the camera to scan the QR code of a computer to connect to.</string>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>AnyPC does not use the microphone. The permission is declared by the WebRTC library.</string>
 	<key>NSLocalNetworkUsageDescription</key>

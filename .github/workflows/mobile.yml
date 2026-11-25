@@ -7,7 +7,17 @@ name: Mobile
 #
 # Releases are tagged mobile-v<version> (version from mobile/pubspec.yaml, a
 # mobile-v* tag or the manual input) and never replace the desktop "Latest" release.
+#
+# The Release workflow (release.yml) also calls this workflow for v* tags; the
+# APK/AAB/IPA are then attached to that release and the separate mobile release
+# is skipped.
 on:
+  workflow_call:
+    inputs:
+      version:
+        description: 'Version to build'
+        required: true
+        type: string
   push:
     branches: [main, mobile]
     tags: ['mobile-v*']
@@ -23,7 +33,7 @@ on:
         default: ''
 
 concurrency:
-  group: mobile-${{ github.ref }}
+  group: mobile-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 env:
@@ -53,10 +63,12 @@ jobs:
       - id: version
         name: Resolve version
         shell: bash
+        env:
+          INPUT_VERSION: ${{ inputs.version }}
         run: |
           PUBSPEC=$(grep -E '^version:' pubspec.yaml | sed -E 's/version:[[:space:]]*([0-9]+\.[0-9]+\.[0-9]+).*/\1/')
-          if [[ "${GITHUB_REF_TYPE}" == "tag" ]]; then VERSION="${GITHUB_REF_NAME#mobile-v}";
-          elif [[ -n "${{ github.event.inputs.version }}" ]]; then VERSION="${{ github.event.inputs.version }}";
+          if [[ -n "$INPUT_VERSION" ]]; then VERSION="${INPUT_VERSION#v}";
+          elif [[ "${GITHUB_REF_TYPE}" == "tag" && "${GITHUB_REF_NAME}" == mobile-v* ]]; then VERSION="${GITHUB_REF_NAME#mobile-v}";
           else VERSION="$PUBSPEC"; fi
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
           echo "build=${GITHUB_RUN_NUMBER}" >> "$GITHUB_OUTPUT"
@@ -156,8 +168,9 @@ jobs:
   publish:
     name: Publish release
     needs: [test, android, ios]
-    # Publish whatever platform builds succeeded (never on pull requests).
-    if: ${{ !cancelled() && github.event_name != 'pull_request' && needs.test.result == 'success' && (needs.android.result == 'success' || needs.ios.result == 'success') }}
+    # Publish whatever platform builds succeeded (never on pull requests). When
+    # called from the Release workflow, that workflow publishes the files instead.
+    if: ${{ !cancelled() && github.workflow == 'Mobile' && github.event_name != 'pull_request' && needs.test.result == 'success' && (needs.android.result == 'success' || needs.ios.result == 'success') }}
     runs-on: ubuntu-latest
     permissions:
       contents: write

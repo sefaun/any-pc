@@ -13,4 +13,7 @@ bool isValid(const QString &normalized);
 /** Groups digits for display ("482913507" -> "482 913 507"). */
 QString format(const QString &normalized);
 
+/** Content of the QR code that shares this address ("anypc://connect?id=482913507"). */
+QString qrPayload(const QString &normalized);
+
 } // namespace anypc::DeviceId

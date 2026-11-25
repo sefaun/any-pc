@@ -17,6 +17,7 @@ namespace anypc {
 
 class AppSettings;
 class IncomingRequestDialog;
+class QrCodeWidget;
 class RecentConnectionsView;
 class SessionManager;
 
@@ -52,12 +53,14 @@ private:
     void showIncomingRequest(const QString &connectionId, const protocol::DeviceSummary &from, int expiresInMs);
     void openSettings();
     void showAbout();
+    void showQrCode();
     void quit();
 
     AppSettings *m_settings;
     SessionManager *m_sessions;
 
     QLabel *m_deviceId = nullptr;
+    QrCodeWidget *m_deviceQr = nullptr;
     QLabel *m_unattended = nullptr;
     QLineEdit *m_remoteId = nullptr;
     QLineEdit *m_remotePassword = nullptr;

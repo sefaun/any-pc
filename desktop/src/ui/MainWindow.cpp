@@ -8,12 +8,15 @@
 #include "ui/RecentConnectionsView.h"
 #include "session/SessionManager.h"
 #include "ui/IncomingRequestDialog.h"
+#include "ui/QrCodeWidget.h"
 #include "ui/SettingsDialog.h"
 
 #include <QApplication>
 #include <QClipboard>
 #include <QCloseEvent>
 #include <QCompleter>
+#include <QDialog>
+#include <QDialogButtonBox>
 #include <QDesktopServices>
 #include <QFrame>
 #include <QHBoxLayout>
@@ -61,7 +64,7 @@ MainWindow::MainWindow(AppSettings *settings, SessionManager *sessions, QWidget 
 {
     setWindowTitle(QString::fromLatin1(build::kAppName));
     setWindowIcon(QIcon(QStringLiteral(":/icons/anypc.svg")));
-    setMinimumSize(780, 620);
+    setMinimumSize(880, 640);
 
     auto *central = new QWidget(this);
     auto *root = new QVBoxLayout(central);
@@ -127,8 +130,13 @@ QWidget *MainWindow::buildLocalCard()
     QVBoxLayout *content = nullptr;
     QWidget *card = makeCard(this, content);
 
-    content->addWidget(makeLabel(tr("This computer"), "cardTitle", card));
-    content->addWidget(makeLabel(tr("Share this address to let others connect to this computer."), "cardHint", card));
+    // Left: address and options; right: the address as a QR code for the mobile app.
+    auto *columns = new QHBoxLayout;
+    columns->setSpacing(14);
+    auto *info = new QVBoxLayout;
+    info->setSpacing(8);
+    info->addWidget(makeLabel(tr("This computer"), "cardTitle", card));
+    info->addWidget(makeLabel(tr("Share this address to let others connect to this computer."), "cardHint", card));
 
     auto *idRow = new QHBoxLayout;
     m_deviceId = new QLabel(QStringLiteral("— — —"), card);
@@ -146,13 +154,36 @@ QWidget *MainWindow::buildLocalCard()
     idRow->addWidget(m_deviceId);
     idRow->addWidget(copy);
     idRow->addStretch();
-    content->addLayout(idRow);
+    info->addLayout(idRow);
 
     m_unattended = makeLabel(QString(), "cardHint", card);
-    content->addWidget(m_unattended);
+    info->addWidget(m_unattended);
     auto *configure = new QPushButton(tr("Configure unattended access…"), card);
     connect(configure, &QPushButton::clicked, this, &MainWindow::openSettings);
-    content->addWidget(configure, 0, Qt::AlignLeft);
+    info->addWidget(configure, 0, Qt::AlignLeft);
+    info->addStretch();
+    columns->addLayout(info, 1);
+
+    m_deviceQr = new QrCodeWidget(card);
+    m_deviceQr->setCursor(Qt::PointingHandCursor);
+    m_deviceQr->setFixedSize(m_deviceQr->sizeHint());
+    connect(m_deviceQr, &QrCodeWidget::clicked, this, &MainWindow::showQrCode);
+    auto *qrButton = new QToolButton(card);
+    qrButton->setText(tr("Enlarge"));
+    qrButton->setToolTip(tr("Show a larger QR code"));
+    qrButton->setAutoRaise(true);
+    connect(qrButton, &QToolButton::clicked, this, &MainWindow::showQrCode);
+    auto *qrColumn = new QVBoxLayout;
+    qrColumn->setSpacing(4);
+    qrColumn->addWidget(m_deviceQr, 0, Qt::AlignHCenter);
+    auto *qrHint = new QLabel(tr("Scan with AnyPC mobile"), card);
+    qrHint->setObjectName(QStringLiteral("cardHint"));
+    qrColumn->addWidget(qrHint, 0, Qt::AlignHCenter);
+    qrColumn->addWidget(qrButton, 0, Qt::AlignHCenter);
+    qrColumn->addStretch();
+    columns->addLayout(qrColumn);
+    content->addLayout(columns);
+
     content->addStretch();
     refreshUnattendedLabel();
     return card;
@@ -261,6 +292,7 @@ void MainWindow::setDeviceId(const QString &deviceId)
 {
     m_rawDeviceId = deviceId;
     m_deviceId->setText(deviceId.isEmpty() ? QStringLiteral("— — —") : DeviceId::format(deviceId));
+    m_deviceQr->setText(deviceId.isEmpty() ? QString() : DeviceId::qrPayload(deviceId));
     if (m_tray && !deviceId.isEmpty())
         m_tray->setToolTip(QStringLiteral("%1 — %2").arg(windowTitle(), DeviceId::format(deviceId)));
 }
@@ -390,6 +422,37 @@ void MainWindow::showIncomingRequest(const QString &connectionId, const protocol
 void MainWindow::openSettings()
 {
     SettingsDialog dialog(m_settings, this);
+    dialog.exec();
+}
+
+void MainWindow::showQrCode()
+{
+    if (m_rawDeviceId.isEmpty()) {
+        showMessage(tr("This computer has no address yet."));
+        return;
+    }
+    QDialog dialog(this);
+    dialog.setWindowTitle(tr("Connect from your phone"));
+    auto *layout = new QVBoxLayout(&dialog);
+    layout->setContentsMargins(24, 20, 24, 16);
+    auto *qr = new QrCodeWidget(&dialog);
+    qr->setFixedSize(300, 300);
+    qr->setText(DeviceId::qrPayload(m_rawDeviceId));
+    auto *id = new QLabel(DeviceId::format(m_rawDeviceId), &dialog);
+    id->setObjectName(QStringLiteral("deviceId"));
+    id->setAlignment(Qt::AlignCenter);
+    id->setTextInteractionFlags(Qt::TextSelectableByMouse);
+    auto *hint = makeLabel(tr("Open AnyPC on your phone, tap the QR code button next to the address field "
+                              "and point the camera at this code."),
+                           "cardHint", &dialog);
+    hint->setAlignment(Qt::AlignCenter);
+    auto *buttons = new QDialogButtonBox(QDialogButtonBox::Close, &dialog);
+    connect(buttons, &QDialogButtonBox::rejected, &dialog, &QDialog::reject);
+    layout->addWidget(qr, 0, Qt::AlignHCenter);
+    layout->addWidget(id);
+    layout->addWidget(hint);
+    layout->addWidget(buttons);
+    dialog.setMaximumWidth(420);
     dialog.exec();
 }
 

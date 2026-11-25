@@ -14,7 +14,7 @@ import 'net/signaling_client.dart';
 import 'rtc/file_transfer.dart';
 import 'rtc/viewer_connection.dart';
 
-const String appVersion = String.fromEnvironment('APP_VERSION', defaultValue: '0.1.0');
+const String appVersion = String.fromEnvironment('APP_VERSION', defaultValue: '0.4.0');
 
 enum OutgoingState { idle, requesting, waiting }
 

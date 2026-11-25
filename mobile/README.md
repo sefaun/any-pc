@@ -64,11 +64,11 @@ flutter test
 
 `.github/workflows/mobile.yml`:
 
-1. `mobile` dalına her push'ta (ve `mobile-v*` etiketlerinde) analiz ve testleri çalıştırır.
+1. `main` ve `mobile` dallarına her push'ta (ve `mobile-v*` etiketlerinde) analiz ve testleri çalıştırır.
 2. Android APK ve AAB ile imzasız iOS IPA derler.
 3. `mobile-v<sürüm>` etiketiyle bir GitHub Release oluşturur. Sürüm `pubspec.yaml`'dan alınır; aynı sürüm tekrar derlenirse release güncellenir. Mobil release'ler masaüstünün "Latest" işaretini değiştirmez.
 
-Yeni sürüm için `pubspec.yaml`'daki `version` değerini artırıp `mobile` dalına push'lamak yeterli.
+Yeni sürüm için `pubspec.yaml`'daki `version` değerini artırıp push'lamak yeterli.
 
 ### Android imzalama (isteğe bağlı)
 

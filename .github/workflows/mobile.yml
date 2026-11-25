@@ -9,7 +9,7 @@ name: Mobile
 # mobile-v* tag or the manual input) and never replace the desktop "Latest" release.
 on:
   push:
-    branches: [mobile]
+    branches: [main, mobile]
     tags: ['mobile-v*']
   pull_request:
     paths:

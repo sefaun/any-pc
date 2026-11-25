@@ -33,6 +33,7 @@ private:
     QLabel *m_passwordState;
     QCheckBox *m_clearPassword;
     QCheckBox *m_clipboardSync;
+    QCheckBox *m_shareAudio;
     QCheckBox *m_minimizeToTray;
 };
 

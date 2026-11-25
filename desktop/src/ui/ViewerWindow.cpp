@@ -39,6 +39,17 @@ ViewerWindow::ViewerWindow(const QString &title, QWidget *parent)
     toolbar->addAction(style()->standardIcon(QStyle::SP_FileDialogListView), tr("Transfers"), this,
                        &ViewerWindow::showTransfersRequested);
 
+    // Checked = muted. Hidden until the host's sound arrives (it may not share sound).
+    m_audioAction = toolbar->addAction(QString());
+    m_audioAction->setCheckable(true);
+    m_audioAction->setVisible(false);
+    connect(m_audioAction, &QAction::toggled, this, [this](bool muted) {
+        updateAudioAction();
+        Q_EMIT audioMuteToggled(muted);
+        m_view->setFocus();
+    });
+    updateAudioAction();
+
     toolbar->addSeparator();
     m_screens->setToolTip(tr("Remote screen"));
     m_screens->setFocusPolicy(Qt::NoFocus);
@@ -106,6 +117,37 @@ void ViewerWindow::setRemoteScreens(const QJsonObject &info)
     }
     // Only worth showing when there is something to choose from.
     m_screensAction->setVisible(m_screens->count() > 1);
+}
+
+void ViewerWindow::setAudioAvailable(bool available)
+{
+    m_audioAction->setVisible(available);
+}
+
+void ViewerWindow::setAudioMuted(bool muted)
+{
+    const QSignalBlocker blocker(m_audioAction);
+    m_audioAction->setChecked(muted);
+    updateAudioAction();
+}
+
+bool ViewerWindow::isAudioMuted() const
+{
+    return m_audioAction->isChecked();
+}
+
+bool ViewerWindow::isAudioAvailable() const
+{
+    return m_audioAction->isVisible();
+}
+
+void ViewerWindow::updateAudioAction()
+{
+    const bool muted = m_audioAction->isChecked();
+    m_audioAction->setIcon(style()->standardIcon(muted ? QStyle::SP_MediaVolumeMuted : QStyle::SP_MediaVolume));
+    m_audioAction->setText(muted ? tr("Sound off") : tr("Sound on"));
+    m_audioAction->setToolTip(muted ? tr("The remote computer's sound is muted. Click to turn it on.")
+                                    : tr("Playing the remote computer's sound. Click to mute it."));
 }
 
 void ViewerWindow::toggleFullScreen()

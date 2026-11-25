@@ -226,6 +226,7 @@
     parseJson,
     CONTROL_CHANNEL: 'control',
     SCREEN_TRACK: 'screen',
+    AUDIO_TRACK: 'audio',
     MAX_CLIPBOARD_LENGTH: 16 * 1024,
   });
 })(window);

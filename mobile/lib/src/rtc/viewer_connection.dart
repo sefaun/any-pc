@@ -20,8 +20,9 @@ class RemoteScreen {
   final String name;
 }
 
-/// The controlling side of a session: receives the host's screen through the
-/// Cloudflare SFU and sends input, clipboard and files back over data channels.
+/// The controlling side of a session: receives the host's screen (and sound,
+/// when the host shares it) through the Cloudflare SFU and sends input,
+/// clipboard and files back over data channels.
 /// Mirrors desktop/resources/web/js/viewer.js.
 class ViewerConnection extends ChangeNotifier implements RemoteInputSink {
   ViewerConnection({
@@ -30,6 +31,7 @@ class ViewerConnection extends ChangeNotifier implements RemoteInputSink {
     required this.peer,
     required this.sendSignal,
     required this.downloadDirectory,
+    this.audioMuted = false,
   });
 
   final ApiClient api;
@@ -47,12 +49,19 @@ class ViewerConnection extends ChangeNotifier implements RemoteInputSink {
   Size frameSize = Size.zero;
   FileTransferService? files;
 
+  /// True once the host's sound track is being received.
+  bool audioAvailable = false;
+
+  /// The user's choice; applied to the sound track as soon as it arrives.
+  bool audioMuted;
+
   /// Emitted when the session fails (the owner ends the connection).
   void Function(String reason)? onFailed;
   void Function(FileTransfer transfer)? onFileReceived;
 
   RTCPeerConnection? _pc;
   RTCDataChannel? _control;
+  MediaStreamTrack? _audioTrack;
   bool _started = false;
   bool _closed = false;
 
@@ -79,8 +88,10 @@ class ViewerConnection extends ChangeNotifier implements RemoteInputSink {
     final trackName = info['trackName'] as String? ?? 'screen';
     final controlName = info['dataChannelName'] as String? ?? 'control';
     final filesName = info['filesChannelName'] as String?;
+    final audioName = info['audioTrackName'] as String?;
     inputSupported = info['inputSupported'] != false;
 
+    if (audioName != null) await _configureAudioOutput();
     final ice = await api.get('/rtc/ice-servers');
     final pc = await createPeerConnection({
       'iceServers': ice['iceServers'] ?? const [],
@@ -96,6 +107,14 @@ class ViewerConnection extends ChangeNotifier implements RemoteInputSink {
       if (s == RTCPeerConnectionState.RTCPeerConnectionStateFailed) _fail('Media connection failed');
     };
     pc.onTrack = (event) async {
+      if (event.track.kind == 'audio') {
+        // Remote audio tracks play through the device speaker automatically.
+        _audioTrack = event.track;
+        event.track.enabled = !audioMuted;
+        audioAvailable = true;
+        notifyListeners();
+        return;
+      }
       if (event.track.kind != 'video') return;
       var stream = event.streams.isNotEmpty ? event.streams.first : null;
       if (stream == null) {
@@ -110,6 +129,7 @@ class ViewerConnection extends ChangeNotifier implements RemoteInputSink {
     await sfu.create();
     await sfu.subscribeTracks([
       {'location': 'remote', 'trackName': trackName, 'kind': 'video'},
+      if (audioName != null) {'location': 'remote', 'trackName': audioName, 'kind': 'audio'},
     ]);
     await sfu.waitForConnection();
     await sfu.establishDataChannels();
@@ -191,6 +211,26 @@ class ViewerConnection extends ChangeNotifier implements RemoteInputSink {
 
   void requestScreen(int index) => _sendJson({'t': 'screen', 'index': index});
 
+  void setAudioMuted(bool muted) {
+    audioMuted = muted;
+    _audioTrack?.enabled = !muted;
+    notifyListeners();
+  }
+
+  /// Plays the host's sound as media (loudspeaker, media volume) rather than
+  /// as a phone call. Best effort: failures leave the platform default.
+  Future<void> _configureAudioOutput() async {
+    try {
+      if (Platform.isAndroid) {
+        await Helper.setAndroidAudioConfiguration(AndroidAudioConfiguration.media);
+      } else if (Platform.isIOS) {
+        await Helper.setAppleAudioIOMode(AppleAudioIOMode.remoteOnly, preferSpeakerOutput: true);
+      }
+    } catch (e) {
+      debugPrint('Audio output configuration failed: $e');
+    }
+  }
+
   Future<bool> sendClipboard() async {
     final data = await Clipboard.getData(Clipboard.kTextPlain);
     final text = data?.text;
@@ -257,6 +297,8 @@ class ViewerConnection extends ChangeNotifier implements RemoteInputSink {
     final pc = _pc;
     _pc = null;
     _control = null;
+    _audioTrack = null;
+    audioAvailable = false;
     try {
       await pc?.close();
     } catch (_) {}

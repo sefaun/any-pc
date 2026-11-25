@@ -21,6 +21,7 @@ Flutter ile yazılmış Android ve iOS istemcisi. Telefondan, AnyPC masaüstü u
 - Uzak bilgisayarda birden fazla monitör varsa ekran seçici.
 - İki yönlü dosya aktarımı: Telefondan dosya gönderilir; bilgisayardan gelen dosyalar uygulama klasörüne (`Documents/AnyPC`) kaydedilir ve paylaş menüsüyle açılabilir. iOS'ta Dosyalar uygulamasında "AnyPC" altında da görünür.
 - Pano metnini bilgisayara gönderme; bilgisayardan gelen pano metni telefona kopyalanır.
+- **Ses:** Bilgisayar sesini paylaşıyorsa ses telefonun hoparlöründen medya sesi olarak çalınır. Araç çubuğundaki hoparlör düğmesiyle kapatılıp açılır; seçim hatırlanır.
 - Karşı taraf bağlantıyı kapatınca bildirim.
 
 Telefonun kendisi uzaktan kontrol edilemez; gelen bağlantı istekleri otomatik reddedilir. Android'de bu özellik ileride Accessibility servisiyle eklenebilir. iOS buna izin vermiyor.
@@ -65,7 +66,7 @@ flutter test
 
 `.github/workflows/mobile.yml`:
 
-1. `main` ve `mobile` dallarına her push'ta (ve `mobile-v*` etiketlerinde) analiz ve testleri çalıştırır.
+1. `main` ve `mobile` dallarına yapılan ve mobil kodu (veya bu workflow'u) değiştiren push'larda, PR'larda ve `mobile-v*` etiketlerinde analiz ve testleri çalıştırır.
 2. Android APK ve AAB ile imzasız iOS IPA derler.
 3. Yalnızca `mobile-v*` etiketlerinde veya elle çalıştırıldığında (**Actions → Mobile → Run workflow**) `mobile-v<sürüm>` etiketiyle ayrı bir GitHub Release oluşturur. Sürüm etiketten, elle girilen değerden ya da `pubspec.yaml`'dan alınır; aynı sürüm tekrar derlenirse release güncellenir. Mobil release'ler masaüstünün "Latest" işaretini değiştirmez. Dal push'larında sadece derleme ve test yapılır.
 

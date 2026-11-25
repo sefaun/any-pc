@@ -17,6 +17,8 @@ constexpr auto DeviceSecret = "device/secret";
 constexpr auto UnattendedHash = "security/unattendedPasswordHash";
 constexpr auto MinimizeToTray = "ui/minimizeToTray";
 constexpr auto ClipboardSync = "session/clipboardSync";
+constexpr auto ShareAudio = "session/shareAudio";
+constexpr auto ViewerAudioMuted = "session/viewerAudioMuted";
 } // namespace Key
 
 } // namespace
@@ -159,6 +161,26 @@ bool AppSettings::clipboardSyncEnabled() const
 void AppSettings::setClipboardSyncEnabled(bool enabled)
 {
     m_settings.setValue(Key::ClipboardSync, enabled);
+}
+
+bool AppSettings::shareAudioEnabled() const
+{
+    return m_settings.value(Key::ShareAudio, true).toBool();
+}
+
+void AppSettings::setShareAudioEnabled(bool enabled)
+{
+    m_settings.setValue(Key::ShareAudio, enabled);
+}
+
+bool AppSettings::viewerAudioMuted() const
+{
+    return m_settings.value(Key::ViewerAudioMuted, false).toBool();
+}
+
+void AppSettings::setViewerAudioMuted(bool muted)
+{
+    m_settings.setValue(Key::ViewerAudioMuted, muted);
 }
 
 

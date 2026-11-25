@@ -1,7 +1,8 @@
 /*
  * Host (controlled side). Runs in an off-screen page:
  *  1. captures a screen (selectable when several monitors are connected);
- *  2. publishes it to the Cloudflare SFU as track "screen";
+ *  2. publishes it to the Cloudflare SFU as track "screen", and the computer's
+ *     sound (when enabled and supported) as track "audio";
  *  3. publishes the "control" and "files" data channels; the viewer subscribes
  *     with `canReply` and sends input events / files back on them;
  *  4. forwards input to native code for injection.
@@ -9,7 +10,8 @@
 'use strict';
 
 (function () {
-  const { SfuSession, waitForConnection, sendJson, parseJson, CONTROL_CHANNEL, SCREEN_TRACK, MAX_CLIPBOARD_LENGTH } = window.AnyPC;
+  const { SfuSession, waitForConnection, sendJson, parseJson, CONTROL_CHANNEL, SCREEN_TRACK, AUDIO_TRACK, MAX_CLIPBOARD_LENGTH } =
+    window.AnyPC;
   const { FileTransferChannel, FILES_CHANNEL } = window.AnyPCFiles;
   const INPUT_TYPES = new Set(['pm', 'pb', 'wh', 'kb', 'tx']);
   const THUMB_WIDTH = 64;
@@ -19,9 +21,15 @@
     return new Promise((resolve) => method(...args, resolve));
   }
 
-  async function captureScreen({ maxWidth, maxHeight, frameRate }) {
+  /**
+   * Captures the screen. With `withAudio`, the system sound ("loopback") is
+   * requested in the same call; Chromium only offers it together with a desktop
+   * video capture. It works on Windows and on Linux with PulseAudio/PipeWire.
+   * Where it is not available the call fails and the caller retries without it.
+   */
+  async function captureScreen({ maxWidth, maxHeight, frameRate }, withAudio = false) {
     const legacy = {
-      audio: false,
+      audio: withAudio ? { mandatory: { chromeMediaSource: 'desktop' } } : false,
       video: {
         mandatory: {
           chromeMediaSource: 'screen',
@@ -36,7 +44,7 @@
       // On Qt >= 6.7 native code chooses the screen (RtcPage::setScreenIndex).
       return await navigator.mediaDevices.getUserMedia(legacy);
     } catch (legacyError) {
-      if (!navigator.mediaDevices.getDisplayMedia) throw legacyError;
+      if (withAudio || !navigator.mediaDevices.getDisplayMedia) throw legacyError;
       return navigator.mediaDevices.getDisplayMedia({
         audio: false,
         video: { width: { max: maxWidth }, height: { max: maxHeight }, frameRate: { max: frameRate }, cursor: 'always' },
@@ -87,6 +95,7 @@
       this.log = log;
       this.pc = null;
       this.sender = null;
+      this.audio = null;
       this.channel = null;
       this.files = null;
       this.capture = null;
@@ -97,9 +106,29 @@
       this.stopped = false;
     }
 
-    /** Captures the selected screen and reports it to native code. */
-    async openCapture() {
-      const stream = await captureScreen(this.config.capture);
+    /**
+     * Captures the selected screen and reports it to native code. With
+     * `withAudio`, also tries to capture the system sound (kept in this.audio).
+     */
+    async openCapture(withAudio = false) {
+      let stream = null;
+      if (withAudio) {
+        try {
+          stream = await captureScreen(this.config.capture, true);
+          const audioTrack = stream.getAudioTracks()[0];
+          if (audioTrack && audioTrack.readyState === 'live') {
+            audioTrack.contentHint = 'music';
+            this.audio = audioTrack;
+          } else if (audioTrack) {
+            audioTrack.stop();
+          }
+          if (!this.audio) this.log.warn('System sound is not available on this computer');
+        } catch (error) {
+          this.log.warn('System sound capture is not available; sharing the screen only', error);
+          stream = null;
+        }
+      }
+      if (!stream) stream = await captureScreen(this.config.capture);
       const sourceTrack = stream.getVideoTracks()[0];
       const settings = sourceTrack.getSettings();
       sourceTrack.addEventListener('ended', () => this.fail('Screen capture stopped'));
@@ -117,7 +146,10 @@
 
     async start() {
       this.bridge.reportState('starting', 'Capturing screen');
-      const [{ iceServers }, capture] = await Promise.all([this.api.iceServers(), this.openCapture()]);
+      const [{ iceServers }, capture] = await Promise.all([
+        this.api.iceServers(),
+        this.openCapture(this.config.shareAudio !== false),
+      ]);
       if (this.stopped) {
         capture.stop();
         return;
@@ -131,12 +163,17 @@
         sendEncodings: [{ maxBitrate: this.config.capture.maxBitrate, maxFramerate: this.config.capture.frameRate }],
       });
       this.sender = transceiver.sender;
+      const published = [{ transceiver, trackName: SCREEN_TRACK }];
+      if (this.audio) {
+        const audioTransceiver = this.pc.addTransceiver(this.audio, { direction: 'sendonly' });
+        published.push({ transceiver: audioTransceiver, trackName: AUDIO_TRACK });
+      }
 
-      this.log.info(`Screen captured (${capture.width}x${capture.height}); publishing`);
+      this.log.info(`Screen captured (${capture.width}x${capture.height}${this.audio ? ', with sound' : ''}); publishing`);
       this.bridge.reportState('connecting', 'Publishing screen');
       const sfu = new SfuSession(this.api, this.config.connectionId, this.pc);
       await sfu.create();
-      await sfu.publishTracks([{ transceiver, trackName: SCREEN_TRACK }]);
+      await sfu.publishTracks(published);
       await waitForConnection(this.pc);
       await this.preferSharpness(transceiver.sender);
 
@@ -156,6 +193,7 @@
       this.announcement = {
         kind: 'host-ready',
         trackName: SCREEN_TRACK,
+        audioTrackName: this.audio ? AUDIO_TRACK : undefined,
         dataChannelName: CONTROL_CHANNEL,
         filesChannelName: FILES_CHANNEL,
         platform: this.config.platform,
@@ -261,9 +299,11 @@
       if (this.channel) this.channel.close();
       if (this.pc) this.pc.close();
       if (this.capture) this.capture.stop();
+      if (this.audio) this.audio.stop();
       this.channel = null;
       this.pc = null;
       this.capture = null;
+      this.audio = null;
     }
   }
 

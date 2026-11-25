@@ -1,11 +1,19 @@
 name: Release
 
 # Pushing a tag such as v1.2.3 (or running the workflow manually with a
-# version) builds and publishes:
+# version) builds and publishes, all on one GitHub Release for the tag:
 #   - the backend Docker image to GitHub Container Registry (repository "Packages")
-#   - Windows (.exe installer), macOS (.dmg) and Linux (.AppImage) desktop builds,
-#   - Android (.apk/.aab) and iOS (unsigned .ipa) mobile builds (mobile.yml),
-#     all attached to a GitHub Release for the tag.
+#   - Windows (.exe installer), macOS (.dmg) and Linux (.AppImage) desktop builds
+#   - Android (.apk/.aab) and iOS (unsigned .ipa) mobile builds (mobile.yml)
+#
+# Robustness:
+#   - The release is created first and every build attaches its own files as
+#     soon as it finishes, so a slow or unavailable runner (e.g. macOS) only
+#     delays its own file instead of blocking the whole release.
+#   - All GitHub API calls go through .github/scripts/release.sh, which retries
+#     transient GitHub errors (5xx) with backoff and is safe to re-run.
+#   - Re-running failed jobs of a run (or running the workflow again with the
+#     same version) updates the existing release instead of failing.
 on:
   push:
     tags: ['v*']
@@ -14,11 +22,14 @@ on:
       version:
         description: 'Version to release (e.g. 1.2.3); the tag v<version> is created on the selected commit'
         required: true
-        default: '0.1.0'
+        type: string
 
 concurrency:
-  group: release-${{ github.ref }}
+  group: release-${{ inputs.version || github.ref_name }}
   cancel-in-progress: false
+
+permissions:
+  contents: read
 
 env:
   QT_VERSION: '6.8.3'
@@ -28,18 +39,60 @@ jobs:
   version:
     name: Resolve version
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     outputs:
       version: ${{ steps.v.outputs.version }}
       numeric: ${{ steps.v.outputs.numeric }}
+      tag: ${{ steps.v.outputs.tag }}
+      prerelease: ${{ steps.v.outputs.prerelease }}
     steps:
       - id: v
         shell: bash
+        env:
+          INPUT_VERSION: ${{ inputs.version }}
         run: |
-          if [[ "${GITHUB_REF_TYPE}" == "tag" ]]; then RAW="${GITHUB_REF_NAME#v}"; else RAW="${{ github.event.inputs.version }}"; fi
-          NUMERIC=$(echo "$RAW" | grep -oE '^[0-9]+\.[0-9]+\.[0-9]+' || echo "0.0.0")
-          echo "version=$RAW" >> "$GITHUB_OUTPUT"
-          echo "numeric=$NUMERIC" >> "$GITHUB_OUTPUT"
-          echo "Version: $RAW (numeric $NUMERIC)"
+          if [[ "${GITHUB_REF_TYPE}" == "tag" ]]; then RAW="${GITHUB_REF_NAME#v}"; else RAW="${INPUT_VERSION#v}"; fi
+          RAW="$(echo "$RAW" | tr -d '[:space:]')"
+          if ! [[ "$RAW" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]]; then
+            echo "::error::'$RAW' is not a version like 1.2.3 or 1.2.3-rc.1"
+            exit 1
+          fi
+          NUMERIC="${RAW%%-*}"
+          PRERELEASE=false
+          [[ "$RAW" == *-* ]] && PRERELEASE=true
+          {
+            echo "version=$RAW"
+            echo "numeric=$NUMERIC"
+            echo "tag=v$RAW"
+            echo "prerelease=$PRERELEASE"
+          } >> "$GITHUB_OUTPUT"
+          echo "Version $RAW (numeric $NUMERIC, tag v$RAW, prerelease $PRERELEASE)"
+
+  release:
+    name: Create GitHub Release
+    needs: version
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      VERSION: ${{ needs.version.outputs.version }}
+      TAG: ${{ needs.version.outputs.tag }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: .github/scripts
+
+      - name: Create or update the release
+        shell: bash
+        run: |
+          mkdir -p empty
+          bash .github/scripts/release-notes.sh "$VERSION" "${{ github.repository_owner }}" empty pending > notes.md
+          FLAGS=()
+          [[ "${{ needs.version.outputs.prerelease }}" == true ]] && FLAGS+=(--prerelease)
+          bash .github/scripts/release.sh ensure "$TAG" "$GITHUB_SHA" "AnyPC $VERSION" notes.md "${FLAGS[@]}"
 
   backend-image:
     name: Backend image
@@ -82,7 +135,7 @@ jobs:
           tags: |
             type=semver,pattern={{version}},value=v${{ needs.version.outputs.version }}
             type=semver,pattern={{major}}.{{minor}},value=v${{ needs.version.outputs.version }}
-            type=raw,value=latest,enable=${{ !contains(needs.version.outputs.version, '-') }}
+            type=raw,value=latest,enable=${{ needs.version.outputs.prerelease != 'true' }}
           labels: |
             org.opencontainers.image.title=anypc-backend
             org.opencontainers.image.description=AnyPC signaling server and Cloudflare Realtime SFU broker
@@ -100,8 +153,10 @@ jobs:
 
   desktop:
     name: Desktop (${{ matrix.name }})
-    needs: version
+    needs: [version, release]
     timeout-minutes: 60
+    permissions:
+      contents: write
     strategy:
       fail-fast: false
       matrix:
@@ -119,6 +174,7 @@ jobs:
     env:
       VERSION: ${{ needs.version.outputs.version }}
       NUMERIC_VERSION: ${{ needs.version.outputs.numeric }}
+      TAG: ${{ needs.version.outputs.tag }}
       # Optional: only pre-fills the first-run server dialog.
       SERVER_URL: ${{ vars.ANYPC_SERVER_URL || '' }}
     steps:
@@ -187,75 +243,87 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
+      - name: Attach to the release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: bash .github/scripts/release.sh upload "$TAG" dist/*
+
   mobile:
     name: Mobile
-    needs: version
+    needs: [version, release]
     uses: ./.github/workflows/mobile.yml
     permissions:
       contents: write
     with:
       version: ${{ needs.version.outputs.version }}
+      release_tag: ${{ needs.version.outputs.tag }}
     secrets: inherit
 
-  publish:
-    name: Publish GitHub Release
-    needs: [version, backend-image, desktop, mobile]
-    # Publish whatever builds succeeded; a missing platform (e.g. no macOS runner
-    # available), a failed mobile build or a failed image build must not block
-    # the other installers.
-    if: ${{ !cancelled() && needs.version.result == 'success' }}
+  finalize:
+    name: Finalize release (notes and checksums)
+    needs: [version, release, backend-image, desktop, mobile]
+    # Runs even when some builds failed or were cancelled: the release keeps the
+    # files that were built and the notes say which ones are missing.
+    if: ${{ always() && needs.release.result == 'success' }}
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     permissions:
       contents: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      VERSION: ${{ needs.version.outputs.version }}
+      TAG: ${{ needs.version.outputs.tag }}
     steps:
-      - uses: actions/download-artifact@v4
+      - uses: actions/checkout@v4
         with:
-          path: artifacts
-          pattern: anypc-*
-          merge-multiple: true
+          sparse-checkout: .github/scripts
 
-      - name: Prepare release notes
-        id: notes
-        env:
-          VERSION: ${{ needs.version.outputs.version }}
-          OWNER: ${{ github.repository_owner }}
+      # The files attached to the release are the source of truth (a re-run
+      # job may have replaced one), so checksums are computed from them.
+      - name: Download the release files
+        shell: bash
+        run: |
+          bash .github/scripts/release.sh download "$TAG" files
+          rm -f files/SHA256SUMS.txt
+          ls -l files
+
+      - name: Checksums and final notes
+        shell: bash
         run: |
           shopt -s nullglob
-          files=(artifacts/*)
-          if [[ ${#files[@]} -eq 0 ]]; then echo "No build succeeded" >&2; exit 1; fi
-          (cd artifacts && sha256sum * > SHA256SUMS.txt && cat SHA256SUMS.txt)
-          row() { [[ -f "artifacts/$2" ]] && echo "| $1 | \`$2\` |" || echo "| $1 | _not available in this release_ |"; }
-          {
-            echo "## Desktop"
-            echo "| Platform | File |"
-            echo "| --- | --- |"
-            row "Windows 10/11 (x64)" "AnyPC-Setup-${VERSION}-x64.exe"
-            row "macOS 12+ (Universal)" "AnyPC-${VERSION}-macOS.dmg"
-            row "Linux x86_64 (X11)" "AnyPC-${VERSION}-x86_64.AppImage"
-            echo
-            echo "## Mobile"
-            echo "| Platform | File |"
-            echo "| --- | --- |"
-            row "Android (APK, install directly)" "AnyPC-Mobile-${VERSION}-android.apk"
-            row "Android (AAB, Google Play)" "AnyPC-Mobile-${VERSION}-android.aab"
-            row "iOS (unsigned IPA)" "AnyPC-Mobile-${VERSION}-ios-unsigned.ipa"
-            echo
-            echo "- **Android:** allow installing from unknown sources and open the APK."
-            echo "- **iOS:** the IPA is unsigned; sign and install it with your Apple ID (e.g. Sideloadly or AltStore)."
-            echo
-            echo "## Backend"
-            echo '```bash'
-            echo "docker pull ghcr.io/${OWNER}/any-pc-backend:${VERSION}"
-            echo '```'
-          } > notes.md
+          assets=(files/*)
+          if (( ${#assets[@]} > 0 )); then
+            (cd files && sha256sum * > SHA256SUMS.txt && cat SHA256SUMS.txt)
+            bash .github/scripts/release.sh upload "$TAG" files/SHA256SUMS.txt
+          else
+            echo "::warning::No build attached a file to the release."
+          fi
+          bash .github/scripts/release-notes.sh "$VERSION" "${{ github.repository_owner }}" files final > notes.md
+          # Append GitHub's generated changelog (best effort).
+          PREVIOUS=$(gh release list --limit 20 --exclude-drafts --json tagName --jq '.[].tagName' | grep -E '^v[0-9]' | grep -vx "$TAG" | head -1 || true)
+          ARGS=(-f "tag_name=$TAG" -f "target_commitish=$GITHUB_SHA")
+          [[ -n "$PREVIOUS" ]] && ARGS+=(-f "previous_tag_name=$PREVIOUS")
+          if CHANGES=$(gh api -X POST "repos/$GH_REPO/releases/generate-notes" "${ARGS[@]}" --jq .body 2>/dev/null); then
+            printf '\n%s\n' "$CHANGES" >> notes.md
+          fi
           cat notes.md
+          bash .github/scripts/release.sh notes "$TAG" notes.md
 
-      - uses: softprops/action-gh-release@v2
-        with:
-          tag_name: v${{ needs.version.outputs.version }}
-          target_commitish: ${{ github.sha }}
-          name: AnyPC ${{ needs.version.outputs.version }}
-          files: artifacts/*
-          prerelease: ${{ contains(needs.version.outputs.version, '-') }}
-          generate_release_notes: true
-          body_path: notes.md
+      - name: Summary
+        if: always()
+        shell: bash
+        run: |
+          {
+            echo "### AnyPC $VERSION"
+            echo
+            echo "| Job | Result |"
+            echo "| --- | --- |"
+            echo "| Backend image | ${{ needs.backend-image.result }} |"
+            echo "| Desktop builds | ${{ needs.desktop.result }} |"
+            echo "| Mobile builds | ${{ needs.mobile.result }} |"
+            echo
+            echo "Release: ${{ github.server_url }}/${{ github.repository }}/releases/tag/$TAG"
+          } >> "$GITHUB_STEP_SUMMARY"

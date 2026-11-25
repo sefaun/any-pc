@@ -30,6 +30,7 @@ SettingsDialog::SettingsDialog(AppSettings *settings, QWidget *parent)
     , m_passwordState(new QLabel(this))
     , m_clearPassword(new QCheckBox(tr("Disable unattended access"), this))
     , m_clipboardSync(new QCheckBox(tr("Synchronise clipboard text during sessions"), this))
+    , m_shareAudio(new QCheckBox(tr("Share this computer's sound when it is being controlled"), this))
     , m_minimizeToTray(new QCheckBox(tr("Keep running in the system tray when the window is closed"), this))
 {
     setWindowTitle(tr("Settings"));
@@ -53,6 +54,7 @@ SettingsDialog::SettingsDialog(AppSettings *settings, QWidget *parent)
     m_passwordConfirm->setEchoMode(QLineEdit::Password);
     m_password->setPlaceholderText(tr("Leave empty to keep the current password"));
     m_clipboardSync->setChecked(settings->clipboardSyncEnabled());
+    m_shareAudio->setChecked(settings->shareAudioEnabled());
     m_minimizeToTray->setChecked(settings->minimizeToTray());
 
     auto *general = new QGroupBox(tr("General"), this);
@@ -60,6 +62,7 @@ SettingsDialog::SettingsDialog(AppSettings *settings, QWidget *parent)
     generalForm->addRow(tr("Server"), serverRow);
     generalForm->addRow(tr("Device name"), m_deviceName);
     generalForm->addRow(QString(), m_clipboardSync);
+    generalForm->addRow(QString(), m_shareAudio);
     generalForm->addRow(QString(), m_minimizeToTray);
 
     auto *security = new QGroupBox(tr("Unattended access"), this);
@@ -118,6 +121,7 @@ void SettingsDialog::accept()
 
     m_settings->setDeviceName(m_deviceName->text());
     m_settings->setClipboardSyncEnabled(m_clipboardSync->isChecked());
+    m_settings->setShareAudioEnabled(m_shareAudio->isChecked());
     m_settings->setMinimizeToTray(m_minimizeToTray->isChecked());
     if (m_clearPassword->isChecked())
         m_settings->clearUnattendedPassword();

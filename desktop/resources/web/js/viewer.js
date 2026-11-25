@@ -1,7 +1,8 @@
 /*
  * Viewer (controlling side):
  *  1. waits for the host's "host-ready" announcement;
- *  2. subscribes to the published screen track;
+ *  2. subscribes to the published screen track (and the sound track, when the
+ *     host shares its sound);
  *  3. subscribes to the host's "control" data channel with `canReply`
  *     and streams keyboard/mouse input back on it.
  */
@@ -166,6 +167,13 @@
       });
       this.pc.addEventListener('track', (event) => {
         this.log.info('Remote track received', event.track.kind);
+        if (event.track.kind === 'audio') {
+          this.ui.audio.srcObject = new MediaStream([event.track]);
+          this.ui.audio.muted = this.config.audioMuted === true;
+          this.ui.audio.play().catch((error) => this.log.warn('Sound playback failed', error));
+          this.bridge.remoteAudio(true);
+          return;
+        }
         this.ui.video.srcObject = new MediaStream([event.track]);
         this.ui.video.play().catch(() => {});
       });
@@ -173,7 +181,9 @@
       const sfu = new SfuSession(this.api, this.config.connectionId, this.pc);
       await sfu.create();
       this.log.info('Subscribing to the host screen');
-      await sfu.subscribeTracks([{ location: 'remote', trackName: info.trackName, kind: 'video' }]);
+      const tracks = [{ location: 'remote', trackName: info.trackName, kind: 'video' }];
+      if (info.audioTrackName) tracks.push({ location: 'remote', trackName: info.audioTrackName, kind: 'audio' });
+      await sfu.subscribeTracks(tracks);
       await waitForConnection(this.pc);
       this.log.info('Media connected; opening control channel');
 
@@ -209,6 +219,12 @@
       }
     }
 
+    setAudioMuted(muted) {
+      this.config.audioMuted = muted;
+      this.ui.audio.muted = muted;
+      if (!muted) this.ui.audio.play().catch(() => {});
+    }
+
     requestScreen(index) {
       sendJson(this.channel, { t: 'screen', index });
     }
@@ -232,16 +248,20 @@
       this.channel = null;
       this.pc = null;
       this.ui.video.srcObject = null;
+      this.ui.audio.srcObject = null;
+      this.bridge.remoteAudio(false);
     }
   }
 
   function createUi() {
     const video = document.getElementById('screen');
+    const audio = document.getElementById('sound');
     const overlay = document.getElementById('overlay');
     const status = document.getElementById('status');
     const spinner = document.getElementById('spinner');
     return {
       video,
+      audio,
       /** Empty text hides the overlay; `persistent` shows a non-blocking banner. */
       setStatus(text, persistent = false) {
         status.textContent = text;
@@ -266,6 +286,7 @@
     bridge.peerSignal.connect((payload) => controller && controller.onPeerSignal(payload));
     bridge.localClipboard.connect((text) => controller && controller.sendClipboard(text));
     bridge.screenRequested.connect((index) => controller && controller.requestScreen(index));
+    bridge.audioMuted.connect((muted) => controller && controller.setAudioMuted(muted));
     bridge.stop.connect(() => controller && controller.stop());
     bridge.pageReady();
   })();

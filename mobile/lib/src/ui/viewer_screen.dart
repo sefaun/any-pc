@@ -118,6 +118,12 @@ class _ViewerScreenState extends State<ViewerScreen> {
 
   // ---- Commands ------------------------------------------------------------------------------
 
+  void _toggleAudio() {
+    final muted = !_connection.audioMuted;
+    _connection.setAudioMuted(muted);
+    AppScope.read(context).settings.setViewerAudioMuted(muted);
+  }
+
   Future<void> _sendFiles() async {
     final picked = await FilePicker.pickFiles(dialogTitle: 'Send files to ${_connection.peer.name}');
     for (final file in picked) {
@@ -269,6 +275,12 @@ class _ViewerScreenState extends State<ViewerScreen> {
               selected: _touch.scrollMode,
               onPressed: () => setState(() => _touch.scrollMode = !_touch.scrollMode),
             ),
+            if (connection.audioAvailable)
+              _ToolButton(
+                icon: connection.audioMuted ? Icons.volume_off : Icons.volume_up,
+                tooltip: connection.audioMuted ? 'Sound off' : 'Sound on',
+                onPressed: _toggleAudio,
+              ),
             if (_touch.transform.scale > 1.01)
               _ToolButton(icon: Icons.zoom_out_map, tooltip: 'Reset zoom', onPressed: _touch.resetZoom),
             if (connection.screens.length > 1)

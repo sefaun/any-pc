@@ -181,7 +181,8 @@ Her release'te şu dosyalar yayınlanır:
 - **Recent sessions**: Daha önce bağlanılan bilgisayarlar kutucuk olarak listelenir (cihaz adı, adres, platform rengi, son bağlantı zamanı). Çift tıklayınca bağlanır; sağ tık menüsünde *Connect*, *Copy address*, *Rename…* ve *Remove from list* vardır. Liste yalnızca bu bilgisayarda saklanır; sunucuya gönderilmez ve şifre tutulmaz.
 - **Gözetimsiz erişim**: *Configure unattended access…* ile şifre belirleyin. Şifre cihazda PBKDF2-SHA256 ile hash'lenmiş olarak saklanır ve doğrulama host tarafında yapılır. Yanlış şifreyle gelen istek otomatik reddedilir.
 - Pencere kapatıldığında uygulama sistem tepsisinde çalışmaya devam eder (ayarlardan kapatılabilir).
-- Viewer penceresi: **Disconnect**, **Full screen**, **Send clipboard**, **Send files**, **Transfers** ve (birden fazla monitör varsa) **ekran seçici**. Bu düğmelerin klavye kısayolu yoktur; tüm tuşlar uzak bilgisayara gider.
+- Viewer penceresi: **Disconnect**, **Full screen**, **Send clipboard**, **Send files**, **Transfers**, **Sound on/off** ve (birden fazla monitör varsa) **ekran seçici**. Bu düğmelerin klavye kısayolu yoktur; tüm tuşlar uzak bilgisayara gider.
+- **Ses:** Kontrol edilen bilgisayarın sesi görüntüyle birlikte gönderilir. Kontrol eden taraf viewer penceresindeki **Sound on/off** düğmesiyle sesi kapatıp açabilir; seçim hatırlanır. Kontrol edilen tarafta **File → Settings → "Share this computer's sound…"** ile ses paylaşımı tamamen kapatılabilir. Sistem sesi Chromium'un "loopback" yakalamasıyla alınır; bu Windows'ta ve Linux'ta (PulseAudio/PipeWire) desteklenir. Ses yakalanamayan sistemlerde (büyük olasılıkla macOS) oturum yalnızca görüntüyle devam eder ve ses düğmesi görünmez.
 - **Çoklu monitör:** Kontrol eden taraf araç çubuğundaki listeden uzak bilgisayarın hangi ekranını göreceğini seçer; görüntü yeniden bağlanmadan değişir, fare/klavye seçilen ekrana yönlenir.
 - **Ekran çerçevesi:** Kontrol edilen bilgisayarda paylaşılan ekranın kenarlarında kırmızı bir çerçeve ve "AnyPC · … is viewing this screen" etiketi görünür. Çerçeve tıklamaları engellemez.
 - **Dosya aktarımı:** İki yönlüdür. Viewer'da **Send files**, kontrol edilen tarafta ana penceredeki **Send files…** düğmesiyle dosya seçilir. Gelen dosyalar `İndirilenler/AnyPC` klasörüne kaydedilir (aynı isim varsa `ad (1).uzantı`). Aktarım penceresinde ilerleme görünür.
@@ -243,10 +244,13 @@ Alternatif olarak GitHub'da **Actions → Release → Run workflow** ile sürüm
 
 `.github/workflows/release.yml` şunları yapar:
 
+0. Önce `v<sürüm>` etiketini ve GitHub Release'i oluşturur. Her derleme işi kendi dosyasını bittiği anda bu release'e ekler; yavaş ya da bekleyen bir makine (ör. macOS) sadece kendi dosyasını geciktirir, release'in tamamını bekletmez.
 1. Backend için lint, typecheck ve testleri çalıştırır, ardından `linux/amd64` + `linux/arm64` Docker image'ını GHCR'ye gönderir: `ghcr.io/sefaun/any-pc-backend:1.0.0`, `:1.0` ve `:latest`. Image'a `org.opencontainers.image.source` etiketi eklendiği için repo sayfasında **Packages** altında görünür.
 2. Qt 6.8 ile Windows, macOS ve Linux istemcilerini derleyip paketler.
 3. `mobile.yml`'yi çağırarak Android (APK/AAB) ve iOS (imzasız IPA) uygulamalarını aynı sürüm numarasıyla derler.
-4. Kurulum dosyalarını ve `SHA256SUMS.txt`'yi etikete ait GitHub Release'e ekler. `-rc` gibi ön ek taşıyan sürümler prerelease olarak işaretlenir.
+4. Tüm işler bitince (bazıları başarısız olsa bile) `SHA256SUMS.txt`'yi ekler ve release notlarını hangi dosyaların mevcut olduğuna göre günceller. `-rc` gibi ön ek taşıyan sürümler prerelease olarak işaretlenir.
+
+GitHub API'si zaman zaman geçici 5xx hataları döndürür. Bütün release işlemleri `.github/scripts/release.sh` üzerinden geri çekilmeli (backoff) olarak tekrar denenir. Bir iş yine de başarısız olursa **Re-run failed jobs** ile tekrar çalıştırmak yeterlidir: mevcut release güncellenir, aynı isimli dosyalar değiştirilir.
 
 İsteğe bağlı repo değişkeni (**Settings → Secrets and variables → Actions → Variables**):
 

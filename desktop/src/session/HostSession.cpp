@@ -1,5 +1,6 @@
 #include "session/HostSession.h"
 
+#include "core/AppSettings.h"
 #include "input/InputInjector.h"
 #include "rtc/RtcBridge.h"
 #include "rtc/RtcPage.h"
@@ -132,6 +133,7 @@ QJsonObject HostSession::startConfig() const
                      {QStringLiteral("frameRate"), kMaxFrameRate},
                      {QStringLiteral("maxBitrate"), kMaxBitrateBps}}},
         {QStringLiteral("inputSupported"), m_injector->isSupported()},
+        {QStringLiteral("shareAudio"), settings()->shareAudioEnabled()},
     };
 }
 

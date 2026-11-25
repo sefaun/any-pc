@@ -20,11 +20,16 @@ public:
     explicit ViewerWindow(const QString &title, QWidget *parent = nullptr);
 
     void setPage(QWebEnginePage *page);
+    bool isAudioMuted() const;
+    bool isAudioAvailable() const;
 
 public Q_SLOTS:
     void setSessionState(const QString &state, const QString &detail);
     /** Host screen list: {screens:[{index,name}], current}. */
     void setRemoteScreens(const QJsonObject &info);
+    /** Shows the sound button once the host's sound is received. */
+    void setAudioAvailable(bool available);
+    void setAudioMuted(bool muted);
 
 Q_SIGNALS:
     void disconnectRequested();
@@ -32,6 +37,7 @@ Q_SIGNALS:
     void sendFilesRequested();
     void showTransfersRequested();
     void screenSelected(int index);
+    void audioMuteToggled(bool muted);
 
 protected:
     void closeEvent(QCloseEvent *event) override;
@@ -39,12 +45,14 @@ protected:
 
 private:
     void toggleFullScreen();
+    void updateAudioAction();
 
     QWebEngineView *m_view;
     QLabel *m_status;
     QComboBox *m_screens;
     QAction *m_screensAction = nullptr;
     QAction *m_fullScreenAction;
+    QAction *m_audioAction = nullptr;
     bool m_closingByUser = false;
 };
 

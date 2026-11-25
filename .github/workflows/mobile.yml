@@ -11,8 +11,11 @@ name: Mobile
 # desktop "Latest" release.
 #
 # The Release workflow (release.yml) also calls this workflow for v* tags; the
-# APK/AAB/IPA are then attached to that release and the separate mobile release
-# is skipped.
+# Android and iOS jobs then attach the APK/AAB/IPA to that release as soon as
+# each build finishes, and the separate mobile release is skipped.
+#
+# Branch pushes only run when the mobile app (or this workflow) changed, so they
+# do not compete with release builds for the macOS runners.
 on:
   workflow_call:
     inputs:
@@ -20,9 +23,17 @@ on:
         description: 'Version to build'
         required: true
         type: string
+      release_tag:
+        description: 'Existing GitHub Release to attach the files to (empty = none)'
+        required: false
+        type: string
+        default: ''
   push:
     branches: [main, mobile]
     tags: ['mobile-v*']
+    paths:
+      - 'mobile/**'
+      - '.github/workflows/mobile.yml'
   pull_request:
     paths:
       - 'mobile/**'
@@ -35,8 +46,9 @@ on:
         default: ''
 
 concurrency:
-  group: mobile-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  group: mobile-${{ github.workflow }}-${{ inputs.version || github.ref }}
+  # Superseded branch/PR builds are cancelled; release builds never are.
+  cancel-in-progress: ${{ github.workflow == 'Mobile' && github.ref_type == 'branch' }}
 
 env:
   FLUTTER_VERSION: '3.47.9'
@@ -72,9 +84,16 @@ jobs:
           if [[ -n "$INPUT_VERSION" ]]; then VERSION="${INPUT_VERSION#v}";
           elif [[ "${GITHUB_REF_TYPE}" == "tag" && "${GITHUB_REF_NAME}" == mobile-v* ]]; then VERSION="${GITHUB_REF_NAME#mobile-v}";
           else VERSION="$PUBSPEC"; fi
+          if ! [[ "$VERSION" =~ ^([0-9]+)\.([0-9]+)\.([0-9]+)(-[0-9A-Za-z.-]+)?$ ]]; then
+            echo "::error::'$VERSION' is not a version like 1.2.3"
+            exit 1
+          fi
+          # Android needs a build number that grows with every version (run
+          # numbers differ between workflows): 1.2.3 -> 1002003.
+          BUILD=$((10#${BASH_REMATCH[1]} * 1000000 + 10#${BASH_REMATCH[2]} * 1000 + 10#${BASH_REMATCH[3]}))
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
-          echo "build=${GITHUB_RUN_NUMBER}" >> "$GITHUB_OUTPUT"
-          echo "Version $VERSION (build $GITHUB_RUN_NUMBER)"
+          echo "build=$BUILD" >> "$GITHUB_OUTPUT"
+          echo "Version $VERSION (build $BUILD)"
 
       - run: flutter pub get
       - run: flutter analyze
@@ -85,6 +104,8 @@ jobs:
     needs: test
     runs-on: ubuntu-latest
     timeout-minutes: 45
+    permissions:
+      contents: write
     env:
       VERSION: ${{ needs.test.outputs.version }}
       BUILD: ${{ needs.test.outputs.build }}
@@ -135,11 +156,22 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
+      - name: Attach to the release
+        if: ${{ inputs.release_tag != '' }}
+        shell: bash
+        working-directory: .
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: bash .github/scripts/release.sh upload "${{ inputs.release_tag }}" mobile/dist/*
+
   ios:
     name: iOS
     needs: test
     runs-on: macos-15
     timeout-minutes: 60
+    permissions:
+      contents: write
     env:
       VERSION: ${{ needs.test.outputs.version }}
       BUILD: ${{ needs.test.outputs.build }}
@@ -167,6 +199,15 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
+      - name: Attach to the release
+        if: ${{ inputs.release_tag != '' }}
+        shell: bash
+        working-directory: .
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: bash .github/scripts/release.sh upload "${{ inputs.release_tag }}" mobile/dist/*
+
   publish:
     name: Publish release
     needs: [test, android, ios]
@@ -184,18 +225,24 @@ jobs:
       VERSION: ${{ needs.test.outputs.version }}
       TAG: mobile-v${{ needs.test.outputs.version }}
     steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: .github/scripts
+
       - uses: actions/download-artifact@v4
         with:
           path: artifacts
           pattern: anypc-mobile-*
           merge-multiple: true
 
-      - name: Release notes and checksums
+      - name: Publish
         shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
         run: |
-          cd artifacts
-          sha256sum * > SHA256SUMS-mobile.txt
-          row() { [[ -f "$2" ]] && echo "| $1 | \`$2\` |" || echo "| $1 | _not available in this build_ |"; }
+          (cd artifacts && sha256sum * > SHA256SUMS-mobile.txt && cat SHA256SUMS-mobile.txt)
+          row() { [[ -f "artifacts/$2" ]] && echo "| $1 | \`$2\` |" || echo "| $1 | _not available in this build_ |"; }
           {
             echo "## AnyPC Mobile $VERSION"
             echo
@@ -205,26 +252,13 @@ jobs:
             row "Android (AAB, Google Play)" "AnyPC-Mobile-$VERSION-android.aab"
             row "iOS (unsigned IPA)" "AnyPC-Mobile-$VERSION-ios-unsigned.ipa"
             echo
-            echo "Built from \`${GITHUB_SHA::7}\` (build ${GITHUB_RUN_NUMBER})."
+            echo "Built from \`${GITHUB_SHA::7}\`."
             echo
             echo "- **Android:** allow installing from unknown sources and open the APK."
             echo "- **iOS:** the IPA is unsigned; sign and install it with your Apple ID (e.g. Sideloadly or AltStore)."
-          } > ../notes.md
-          cat ../notes.md
-
-      # Rebuilding the same version (e.g. a new push to the mobile branch) replaces its release.
-      - name: Remove previous release of this version
-        if: github.ref_type != 'tag'
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: gh release delete "$TAG" --repo "$GITHUB_REPOSITORY" --cleanup-tag --yes || true
-
-      - uses: softprops/action-gh-release@v2
-        with:
-          tag_name: ${{ env.TAG }}
-          target_commitish: ${{ github.sha }}
-          name: AnyPC Mobile ${{ env.VERSION }}
-          body_path: notes.md
-          files: artifacts/*
-          make_latest: 'false'
-          prerelease: ${{ contains(env.VERSION, '-') }}
+          } > notes.md
+          cat notes.md
+          FLAGS=(--not-latest)
+          [[ "$VERSION" == *-* ]] && FLAGS+=(--prerelease)
+          bash .github/scripts/release.sh ensure "$TAG" "$GITHUB_SHA" "AnyPC Mobile $VERSION" notes.md "${FLAGS[@]}"
+          bash .github/scripts/release.sh upload "$TAG" artifacts/*

@@ -1,5 +1,6 @@
 #include "session/ViewerSession.h"
 
+#include "core/AppSettings.h"
 #include "core/DeviceId.h"
 #include "rtc/RtcBridge.h"
 #include "rtc/RtcPage.h"
@@ -27,6 +28,14 @@ ViewerSession::ViewerSession(const QString &connectionId, const protocol::Device
     connect(m_window, &ViewerWindow::showTransfersRequested, this, &RtcSession::showFileTransfers);
     connect(m_window, &ViewerWindow::screenSelected, bridge(), &RtcBridge::screenRequested);
     connect(bridge(), &RtcBridge::remoteScreensReceived, m_window, &ViewerWindow::setRemoteScreens);
+
+    // Sound: the button is shown once the host publishes audio; the choice is remembered.
+    m_window->setAudioMuted(settings->viewerAudioMuted());
+    connect(bridge(), &RtcBridge::remoteAudioAvailable, m_window, &ViewerWindow::setAudioAvailable);
+    connect(m_window, &ViewerWindow::audioMuteToggled, this, [this](bool muted) {
+        this->settings()->setViewerAudioMuted(muted);
+        Q_EMIT bridge()->audioMuted(muted);
+    });
 }
 
 ViewerSession::~ViewerSession()
@@ -54,6 +63,7 @@ QJsonObject ViewerSession::startConfig() const
         {QStringLiteral("role"), QStringLiteral("viewer")},
         {QStringLiteral("connectionId"), connectionId()},
         {QStringLiteral("peerName"), peer().name},
+        {QStringLiteral("audioMuted"), settings()->viewerAudioMuted()},
     };
 }
 

@@ -2,6 +2,7 @@
 
 #include "BuildInfo.h"
 #include "core/PasswordHasher.h"
+#include "core/RecentConnections.h"
 
 #include <QSysInfo>
 
@@ -16,14 +17,13 @@ constexpr auto DeviceSecret = "device/secret";
 constexpr auto UnattendedHash = "security/unattendedPasswordHash";
 constexpr auto MinimizeToTray = "ui/minimizeToTray";
 constexpr auto ClipboardSync = "session/clipboardSync";
-constexpr auto Recent = "ui/recentConnections";
 } // namespace Key
 
-constexpr int kMaxRecentConnections = 8;
 } // namespace
 
 AppSettings::AppSettings(QObject *parent)
     : QObject(parent)
+    , m_recent(new RecentConnections(&m_settings, this))
 {
 }
 
@@ -161,19 +161,5 @@ void AppSettings::setClipboardSyncEnabled(bool enabled)
     m_settings.setValue(Key::ClipboardSync, enabled);
 }
 
-QStringList AppSettings::recentConnections() const
-{
-    return m_settings.value(Key::Recent).toStringList();
-}
-
-void AppSettings::addRecentConnection(const QString &deviceId)
-{
-    QStringList recent = recentConnections();
-    recent.removeAll(deviceId);
-    recent.prepend(deviceId);
-    while (recent.size() > kMaxRecentConnections)
-        recent.removeLast();
-    m_settings.setValue(Key::Recent, recent);
-}
 
 } // namespace anypc

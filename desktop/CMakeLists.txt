@@ -39,6 +39,7 @@ set(ANYPC_LIB_SOURCES
     src/core/DeviceId.cpp              src/core/DeviceId.h
     src/core/Logging.cpp               src/core/Logging.h
     src/core/PasswordHasher.cpp        src/core/PasswordHasher.h
+    src/core/RecentConnections.cpp     src/core/RecentConnections.h
     src/network/ApiClient.cpp          src/network/ApiClient.h
     src/network/SignalingClient.cpp    src/network/SignalingClient.h
     src/network/Protocol.h
@@ -62,6 +63,7 @@ set(ANYPC_LIB_SOURCES
     src/ui/ViewerWindow.cpp            src/ui/ViewerWindow.h
     src/ui/FileTransferDialog.cpp      src/ui/FileTransferDialog.h
     src/ui/ScreenBorderOverlay.cpp     src/ui/ScreenBorderOverlay.h
+    src/ui/RecentConnectionsView.cpp   src/ui/RecentConnectionsView.h
     src/ui/Theme.cpp                   src/ui/Theme.h
 )
 

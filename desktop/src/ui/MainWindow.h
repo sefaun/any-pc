@@ -17,6 +17,7 @@ namespace anypc {
 
 class AppSettings;
 class IncomingRequestDialog;
+class RecentConnectionsView;
 class SessionManager;
 
 /** Main window: shows this device's address and starts outgoing connections. */
@@ -64,6 +65,7 @@ private:
     QPushButton *m_cancelButton = nullptr;
     QLabel *m_outgoingStatus = nullptr;
     QFrame *m_controlBanner = nullptr;
+    RecentConnectionsView *m_recentView = nullptr;
     QLabel *m_controlLabel = nullptr;
     QLabel *m_statusDot = nullptr;
     QLabel *m_statusText = nullptr;

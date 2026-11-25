@@ -8,6 +8,8 @@
 
 namespace anypc {
 
+class RecentConnections;
+
 /**
  * Persistent user and device configuration backed by QSettings.
  * Emits change signals so dependent services can react (e.g. reconnect
@@ -49,8 +51,8 @@ public:
     bool clipboardSyncEnabled() const;
     void setClipboardSyncEnabled(bool enabled);
 
-    QStringList recentConnections() const;
-    void addRecentConnection(const QString &deviceId);
+    /** Locally stored history of outgoing connections. */
+    RecentConnections *recentConnections() const { return m_recent; }
 
 Q_SIGNALS:
     void serverUrlChanged(const QUrl &url);
@@ -59,6 +61,7 @@ Q_SIGNALS:
 
 private:
     QSettings m_settings;
+    RecentConnections *m_recent;
 };
 
 } // namespace anypc

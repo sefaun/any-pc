@@ -175,6 +175,7 @@ Her release'te şu dosyalar yayınlanır:
 
 - **This computer**: cihazın adresi. Kopyalayıp karşı tarafa iletin.
 - **Remote computer**: bağlanılacak adresi yazıp **Connect**'e basın. Karşı tarafta gözetimsiz erişim açıksa şifreyi de yazın.
+- **Recent sessions**: Daha önce bağlanılan bilgisayarlar kutucuk olarak listelenir (cihaz adı, adres, platform rengi, son bağlantı zamanı). Çift tıklayınca bağlanır; sağ tık menüsünde *Connect*, *Copy address*, *Rename…* ve *Remove from list* vardır. Liste yalnızca bu bilgisayarda saklanır; sunucuya gönderilmez ve şifre tutulmaz.
 - **Gözetimsiz erişim**: *Configure unattended access…* ile şifre belirleyin. Şifre cihazda PBKDF2-SHA256 ile hash'lenmiş olarak saklanır ve doğrulama host tarafında yapılır. Yanlış şifreyle gelen istek otomatik reddedilir.
 - Pencere kapatıldığında uygulama sistem tepsisinde çalışmaya devam eder (ayarlardan kapatılabilir).
 - Viewer penceresi: **Disconnect**, **Full screen**, **Send clipboard**, **Send files**, **Transfers** ve (birden fazla monitör varsa) **ekran seçici**. Bu düğmelerin klavye kısayolu yoktur; tüm tuşlar uzak bilgisayara gider.

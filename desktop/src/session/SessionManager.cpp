@@ -2,6 +2,7 @@
 
 #include "core/AppSettings.h"
 #include "core/DeviceId.h"
+#include "core/RecentConnections.h"
 #include "network/SignalingClient.h"
 #include "session/HostSession.h"
 #include "session/ViewerSession.h"
@@ -78,7 +79,7 @@ void SessionManager::connectTo(const QString &deviceId, const QString &password)
     }
     m_outgoingRequestId = QUuid::createUuid().toString(QUuid::WithoutBraces);
     m_outgoingTargetId = deviceId;
-    m_settings->addRecentConnection(deviceId);
+    m_settings->recentConnections()->recordAttempt(deviceId);
     m_signaling->requestConnection(deviceId, password, m_outgoingRequestId);
 }
 
@@ -105,6 +106,7 @@ void SessionManager::onPending(const QString &requestId, const QString &connecti
     if (requestId != m_outgoingRequestId)
         return;
     m_outgoingConnectionId = connectionId;
+    m_settings->recentConnections()->updateDetails(target.id, target.name, target.platform);
     Q_EMIT outgoingPending(target);
 }
 
@@ -161,6 +163,7 @@ void SessionManager::onAccepted(const QString &connectionId, protocol::Role role
         return;
 
     if (role == protocol::Role::Viewer) {
+        m_settings->recentConnections()->updateDetails(peer.id, peer.name, peer.platform);
         if (connectionId == m_outgoingConnectionId)
             clearOutgoing();
         startSession(new ViewerSession(connectionId, peer, m_api, m_settings, this));

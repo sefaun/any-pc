@@ -4,6 +4,8 @@
 #include "core/AppSettings.h"
 #include "core/DeviceId.h"
 #include "core/Logging.h"
+#include "core/RecentConnections.h"
+#include "ui/RecentConnectionsView.h"
 #include "session/SessionManager.h"
 #include "ui/IncomingRequestDialog.h"
 #include "ui/SettingsDialog.h"
@@ -59,7 +61,7 @@ MainWindow::MainWindow(AppSettings *settings, SessionManager *sessions, QWidget 
 {
     setWindowTitle(QString::fromLatin1(build::kAppName));
     setWindowIcon(QIcon(QStringLiteral(":/icons/anypc.svg")));
-    setMinimumSize(760, 420);
+    setMinimumSize(780, 620);
 
     auto *central = new QWidget(this);
     auto *root = new QVBoxLayout(central);
@@ -73,7 +75,18 @@ MainWindow::MainWindow(AppSettings *settings, SessionManager *sessions, QWidget 
     cards->setSpacing(14);
     cards->addWidget(buildLocalCard(), 1);
     cards->addWidget(buildRemoteCard(), 1);
-    root->addLayout(cards, 1);
+    root->addLayout(cards);
+
+    m_recentView = new RecentConnectionsView(m_settings->recentConnections(), this);
+    root->addWidget(m_recentView, 1);
+    connect(m_recentView, &RecentConnectionsView::deviceSelected, this,
+            [this](const QString &id) { m_remoteId->setText(DeviceId::format(id)); });
+    connect(m_recentView, &RecentConnectionsView::connectRequested, this, [this](const QString &id) {
+        m_remoteId->setText(DeviceId::format(id));
+        startConnection();
+    });
+    connect(m_recentView, &RecentConnectionsView::message, this, &MainWindow::showMessage);
+    connect(m_settings->recentConnections(), &RecentConnections::changed, this, &MainWindow::refreshRecent);
     setCentralWidget(central);
 
     m_statusDot = new QLabel(QStringLiteral("●"), this);
@@ -322,8 +335,8 @@ void MainWindow::refreshUnattendedLabel()
 void MainWindow::refreshRecent()
 {
     QStringList formatted;
-    for (const QString &id : m_settings->recentConnections())
-        formatted.append(DeviceId::format(id));
+    for (const RecentConnections::Entry &entry : m_settings->recentConnections()->entries())
+        formatted.append(DeviceId::format(entry.id));
     if (auto *model = qobject_cast<QStringListModel *>(m_remoteId->completer()->model()))
         model->setStringList(formatted);
 }
@@ -352,6 +365,8 @@ void MainWindow::setOutgoingBusy(bool busy, const QString &text)
 {
     m_connectButton->setEnabled(!busy);
     m_cancelButton->setVisible(busy);
+    if (m_recentView)
+        m_recentView->setConnectEnabled(!busy);
     m_remoteId->setEnabled(!busy);
     m_remotePassword->setEnabled(!busy);
     m_outgoingStatus->setText(text);

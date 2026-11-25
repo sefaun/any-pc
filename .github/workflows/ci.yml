@@ -2,7 +2,7 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    branches: [main, mobile]
   pull_request:
 
 concurrency:
@@ -43,7 +43,7 @@ jobs:
           cache-to: type=gha,mode=max
 
   desktop-linux:
-    name: Desktop (Linux build)
+    name: Desktop (Linux build + tests)
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v4
@@ -63,3 +63,33 @@ jobs:
         env:
           QT_QPA_PLATFORM: offscreen
         run: ctest --test-dir build --output-on-failure
+
+  desktop-native:
+    name: Desktop (${{ matrix.name }} build)
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: windows
+            os: windows-2022
+            qt-arch: win64_msvc2022_64
+          - name: macos
+            os: macos-15
+            qt-arch: clang_64
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ilammy/msvc-dev-cmd@v1
+        if: runner.os == 'Windows'
+      - name: Install Ninja
+        if: runner.os == 'macOS'
+        run: brew install ninja
+      - uses: jurplel/install-qt-action@v4
+        with:
+          version: '6.8.3'
+          arch: ${{ matrix.qt-arch }}
+          modules: 'qtwebengine qtwebchannel qtwebsockets qtpositioning'
+          cache: true
+      - run: cmake -S desktop -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DANYPC_BUILD_TESTS=OFF
+      - run: cmake --build build --parallel

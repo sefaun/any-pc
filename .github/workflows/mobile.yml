@@ -1,0 +1,214 @@
+name: Mobile
+
+# Builds the Flutter app (mobile/) and publishes the installers:
+#   - Android: universal release APK (+ AAB for Google Play)
+#   - iOS: unsigned IPA (sign it with your own Apple ID, e.g. Sideloadly/AltStore,
+#     or configure signing secrets for TestFlight)
+#
+# Releases are tagged mobile-v<version> (version from mobile/pubspec.yaml, a
+# mobile-v* tag or the manual input) and never replace the desktop "Latest" release.
+on:
+  push:
+    branches: [mobile]
+    tags: ['mobile-v*']
+  pull_request:
+    paths:
+      - 'mobile/**'
+      - '.github/workflows/mobile.yml'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to release (e.g. 0.2.0); empty = pubspec.yaml version'
+        required: false
+        default: ''
+
+concurrency:
+  group: mobile-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  FLUTTER_VERSION: '3.47.9'
+
+defaults:
+  run:
+    working-directory: mobile
+
+jobs:
+  test:
+    name: Analyze & test
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      build: ${{ steps.version.outputs.build }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+
+      - id: version
+        name: Resolve version
+        shell: bash
+        run: |
+          PUBSPEC=$(grep -E '^version:' pubspec.yaml | sed -E 's/version:[[:space:]]*([0-9]+\.[0-9]+\.[0-9]+).*/\1/')
+          if [[ "${GITHUB_REF_TYPE}" == "tag" ]]; then VERSION="${GITHUB_REF_NAME#mobile-v}";
+          elif [[ -n "${{ github.event.inputs.version }}" ]]; then VERSION="${{ github.event.inputs.version }}";
+          else VERSION="$PUBSPEC"; fi
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "build=${GITHUB_RUN_NUMBER}" >> "$GITHUB_OUTPUT"
+          echo "Version $VERSION (build $GITHUB_RUN_NUMBER)"
+
+      - run: flutter pub get
+      - run: flutter analyze
+      - run: flutter test
+
+  android:
+    name: Android
+    needs: test
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      VERSION: ${{ needs.test.outputs.version }}
+      BUILD: ${{ needs.test.outputs.build }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+
+      - name: Release keystore (optional)
+        env:
+          KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+        shell: bash
+        run: |
+          if [[ -n "$KEYSTORE_BASE64" ]]; then
+            echo "$KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/release.jks"
+            echo "ANDROID_KEYSTORE_PATH=$RUNNER_TEMP/release.jks" >> "$GITHUB_ENV"
+            echo "Using the release keystore"
+          else
+            echo "::notice::ANDROID_KEYSTORE_BASE64 is not set; the APK is signed with a debug key."
+          fi
+
+      - name: Build APK and AAB
+        env:
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          flutter pub get
+          flutter build apk --release --build-name="$VERSION" --build-number="$BUILD" --dart-define=APP_VERSION="$VERSION"
+          flutter build appbundle --release --build-name="$VERSION" --build-number="$BUILD" --dart-define=APP_VERSION="$VERSION"
+          mkdir -p dist
+          cp build/app/outputs/flutter-apk/app-release.apk "dist/AnyPC-Mobile-$VERSION-android.apk"
+          cp build/app/outputs/bundle/release/app-release.aab "dist/AnyPC-Mobile-$VERSION-android.aab"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: anypc-mobile-android
+          path: mobile/dist/*
+          if-no-files-found: error
+          retention-days: 14
+
+  ios:
+    name: iOS
+    needs: test
+    runs-on: macos-15
+    timeout-minutes: 60
+    env:
+      VERSION: ${{ needs.test.outputs.version }}
+      BUILD: ${{ needs.test.outputs.build }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+
+      - name: Build unsigned IPA
+        run: |
+          flutter pub get
+          flutter build ios --release --no-codesign --build-name="$VERSION" --build-number="$BUILD" --dart-define=APP_VERSION="$VERSION"
+          mkdir -p dist/Payload
+          cp -R build/ios/iphoneos/Runner.app dist/Payload/
+          (cd dist && zip -qry "AnyPC-Mobile-$VERSION-ios-unsigned.ipa" Payload && rm -rf Payload)
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: anypc-mobile-ios
+          path: mobile/dist/*
+          if-no-files-found: error
+          retention-days: 14
+
+  publish:
+    name: Publish release
+    needs: [test, android, ios]
+    # Publish whatever platform builds succeeded (never on pull requests).
+    if: ${{ !cancelled() && github.event_name != 'pull_request' && needs.test.result == 'success' && (needs.android.result == 'success' || needs.ios.result == 'success') }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    defaults:
+      run:
+        working-directory: .
+    env:
+      VERSION: ${{ needs.test.outputs.version }}
+      TAG: mobile-v${{ needs.test.outputs.version }}
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          pattern: anypc-mobile-*
+          merge-multiple: true
+
+      - name: Release notes and checksums
+        shell: bash
+        run: |
+          cd artifacts
+          sha256sum * > SHA256SUMS-mobile.txt
+          row() { [[ -f "$2" ]] && echo "| $1 | \`$2\` |" || echo "| $1 | _not available in this build_ |"; }
+          {
+            echo "## AnyPC Mobile $VERSION"
+            echo
+            echo "| Platform | File |"
+            echo "| --- | --- |"
+            row "Android (APK, install directly)" "AnyPC-Mobile-$VERSION-android.apk"
+            row "Android (AAB, Google Play)" "AnyPC-Mobile-$VERSION-android.aab"
+            row "iOS (unsigned IPA)" "AnyPC-Mobile-$VERSION-ios-unsigned.ipa"
+            echo
+            echo "Built from \`${GITHUB_SHA::7}\` (build ${GITHUB_RUN_NUMBER})."
+            echo
+            echo "- **Android:** allow installing from unknown sources and open the APK."
+            echo "- **iOS:** the IPA is unsigned; sign and install it with your Apple ID (e.g. Sideloadly or AltStore)."
+          } > ../notes.md
+          cat ../notes.md
+
+      # Rebuilding the same version (e.g. a new push to the mobile branch) replaces its release.
+      - name: Remove previous release of this version
+        if: github.ref_type != 'tag'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release delete "$TAG" --repo "$GITHUB_REPOSITORY" --cleanup-tag --yes || true
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ env.TAG }}
+          target_commitish: ${{ github.sha }}
+          name: AnyPC Mobile ${{ env.VERSION }}
+          body_path: notes.md
+          files: artifacts/*
+          make_latest: 'false'
+          prerelease: ${{ contains(env.VERSION, '-') }}

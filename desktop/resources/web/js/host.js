@@ -11,7 +11,7 @@
 (function () {
   const { SfuSession, waitForConnection, sendJson, parseJson, CONTROL_CHANNEL, SCREEN_TRACK, MAX_CLIPBOARD_LENGTH } = window.AnyPC;
   const { FileTransferChannel, FILES_CHANNEL } = window.AnyPCFiles;
-  const INPUT_TYPES = new Set(['pm', 'pb', 'wh', 'kb']);
+  const INPUT_TYPES = new Set(['pm', 'pb', 'wh', 'kb', 'tx']);
   const THUMB_WIDTH = 64;
   const THUMB_HEIGHT = 36;
 

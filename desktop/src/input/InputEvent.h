@@ -18,10 +18,11 @@ enum class MouseButton { Left = 0, Middle = 1, Right = 2, Back = 3, Forward = 4 
  *   {"t":"pb","b":0,"d":true,"x":..,"y":..}       pointer button down/up
  *   {"t":"wh","dx":0,"dy":120}                    wheel, CSS pixels
  *   {"t":"kb","c":"KeyA","d":true}                key by KeyboardEvent.code
+ *   {"t":"tx","s":"Merhaba ğ"}                    Unicode text (mobile keyboards)
  */
 struct InputEvent
 {
-    enum class Type { PointerMove, PointerButton, Wheel, Key };
+    enum class Type { PointerMove, PointerButton, Wheel, Key, Text };
 
     Type type = Type::PointerMove;
     QPointF position;            ///< Normalised [0,1] coordinates.
@@ -30,6 +31,9 @@ struct InputEvent
     double wheelDx = 0;
     double wheelDy = 0;
     QString keyCode;             ///< DOM KeyboardEvent.code, e.g. "KeyA".
+    QString text;                ///< Characters to type (Type::Text).
+
+    static constexpr int kMaxTextLength = 256;
 
     static std::optional<InputEvent> fromJson(const QJsonObject &json);
 };

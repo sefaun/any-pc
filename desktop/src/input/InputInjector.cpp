@@ -96,6 +96,9 @@ void InputInjector::handle(const InputEvent &event)
         this->key(*key, event.pressed);
         break;
     }
+    case InputEvent::Type::Text:
+        typeText(event.text);
+        break;
     }
 }
 

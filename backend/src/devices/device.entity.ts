@@ -1,4 +1,4 @@
-export const DEVICE_PLATFORMS = ['windows', 'macos', 'linux', 'unknown'] as const;
+export const DEVICE_PLATFORMS = ['windows', 'macos', 'linux', 'android', 'ios', 'unknown'] as const;
 export type DevicePlatform = (typeof DEVICE_PLATFORMS)[number];
 
 export const DEVICE_ID_LENGTH = 9;

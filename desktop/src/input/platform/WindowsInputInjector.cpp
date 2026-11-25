@@ -13,6 +13,7 @@
 
 #include <cmath>
 #include <string>
+#include <vector>
 
 namespace anypc {
 
@@ -118,6 +119,35 @@ protected:
         input.ki.wScan = static_cast<WORD>(MapVirtualKeyW(key.windowsVirtualKey, MAPVK_VK_TO_VSC));
         input.ki.dwFlags = (key.windowsExtended ? KEYEVENTF_EXTENDEDKEY : 0) | (pressed ? 0 : KEYEVENTF_KEYUP);
         SendInput(1, &input, sizeof(INPUT));
+    }
+
+    void typeText(const QString &text) override
+    {
+        // KEYEVENTF_UNICODE sends UTF-16 code units; surrogate pairs are sent as two units.
+        std::vector<INPUT> inputs;
+        inputs.reserve(size_t(text.size()) * 2);
+        for (const QChar ch : text) {
+            if (ch == QLatin1Char('\n') || ch == QLatin1Char('\r')) {
+                INPUT down{};
+                down.type = INPUT_KEYBOARD;
+                down.ki.wVk = VK_RETURN;
+                INPUT up = down;
+                up.ki.dwFlags = KEYEVENTF_KEYUP;
+                inputs.push_back(down);
+                inputs.push_back(up);
+                continue;
+            }
+            INPUT down{};
+            down.type = INPUT_KEYBOARD;
+            down.ki.wScan = ch.unicode();
+            down.ki.dwFlags = KEYEVENTF_UNICODE;
+            INPUT up = down;
+            up.ki.dwFlags = KEYEVENTF_UNICODE | KEYEVENTF_KEYUP;
+            inputs.push_back(down);
+            inputs.push_back(up);
+        }
+        if (!inputs.empty())
+            SendInput(UINT(inputs.size()), inputs.data(), sizeof(INPUT));
     }
 
 private:

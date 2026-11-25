@@ -3,6 +3,7 @@
 AnyDesk benzeri, platformlar arası uzak masaüstü uygulaması.
 
 - **Masaüstü istemcisi** (`desktop/`): Qt 6 / C++17. Windows, macOS ve Linux (X11).
+- **Mobil istemci** (`mobile/`): Flutter. Android ve iOS'tan bilgisayarları kontrol eder. Ayrıntılar: [`mobile/README.md`](mobile/README.md).
 - **Backend** (`backend/`): NestJS / TypeScript. Cihaz kaydı, WebSocket sinyalleşme ve Cloudflare Realtime SFU aracılığı.
 - **Medya ve veri taşıma**: [Cloudflare Realtime SFU](https://developers.cloudflare.com/realtime/sfu/) + [Cloudflare TURN](https://developers.cloudflare.com/realtime/turn/).
 

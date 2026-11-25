@@ -114,7 +114,76 @@ protected:
         XFlush(m_display);
     }
 
+    void typeText(const QString &text) override
+    {
+        const KeyCode shift = XKeysymToKeycode(m_display, XK_Shift_L);
+        for (const uint codepoint : text.toUcs4()) {
+            KeySym sym;
+            if (codepoint == '\n' || codepoint == '\r')
+                sym = XK_Return;
+            else if (codepoint >= 0x20 && codepoint < 0x7f)
+                sym = codepoint; // Latin-1 keysyms equal their code points
+            else
+                sym = 0x01000000 | codepoint; // Unicode keysym
+            typeKeysym(sym, shift);
+        }
+        XFlush(m_display);
+    }
+
 private:
+    /**
+     * Types one keysym. Uses the current keymap when possible; otherwise
+     * temporarily binds the keysym to a spare keycode.
+     */
+    void typeKeysym(KeySym sym, KeyCode shift)
+    {
+        KeyCode code = XKeysymToKeycode(m_display, sym);
+        bool needShift = false;
+        if (code != 0) {
+            int perCode = 0;
+            KeySym *syms = XGetKeyboardMapping(m_display, code, 1, &perCode);
+            if (syms) {
+                needShift = perCode > 1 && syms[0] != sym && syms[1] == sym;
+                XFree(syms);
+            }
+            pressCode(code, needShift ? shift : 0);
+            return;
+        }
+        int minCode = 0, maxCode = 0, perCode = 0;
+        XDisplayKeycodes(m_display, &minCode, &maxCode);
+        KeySym *map = XGetKeyboardMapping(m_display, KeyCode(minCode), maxCode - minCode + 1, &perCode);
+        if (!map)
+            return;
+        KeyCode spare = 0;
+        for (int c = maxCode; c >= minCode && spare == 0; --c) {
+            bool empty = true;
+            for (int i = 0; i < perCode; ++i)
+                empty = empty && map[(c - minCode) * perCode + i] == 0;
+            if (empty)
+                spare = KeyCode(c);
+        }
+        XFree(map);
+        if (spare == 0)
+            return;
+        KeySym binding[2] = {sym, sym};
+        XChangeKeyboardMapping(m_display, spare, 2, binding, 1);
+        XSync(m_display, False);
+        pressCode(spare, 0);
+        KeySym none[2] = {0, 0};
+        XChangeKeyboardMapping(m_display, spare, 2, none, 1);
+        XSync(m_display, False);
+    }
+
+    void pressCode(KeyCode code, KeyCode modifier)
+    {
+        if (modifier)
+            XTestFakeKeyEvent(m_display, modifier, True, CurrentTime);
+        XTestFakeKeyEvent(m_display, code, True, CurrentTime);
+        XTestFakeKeyEvent(m_display, code, False, CurrentTime);
+        if (modifier)
+            XTestFakeKeyEvent(m_display, modifier, False, CurrentTime);
+    }
+
     static unsigned int x11Button(MouseButton button)
     {
         switch (button) {

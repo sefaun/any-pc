@@ -36,6 +36,17 @@ private Q_SLOTS:
         QVERIFY(!k->pressed);
     }
 
+    void parsesText()
+    {
+        const auto t = InputEvent::fromJson({{"t", "tx"}, {"s", QStringLiteral("Merhaba ğüşİ")}});
+        QVERIFY(t.has_value());
+        QCOMPARE(t->type, InputEvent::Type::Text);
+        QCOMPARE(t->text, QStringLiteral("Merhaba ğüşİ"));
+        QVERIFY(!InputEvent::fromJson({{"t", "tx"}, {"s", ""}}).has_value());
+        const auto longText = InputEvent::fromJson({{"t", "tx"}, {"s", QString(1000, QLatin1Char('a'))}});
+        QCOMPARE(longText->text.size(), InputEvent::kMaxTextLength);
+    }
+
     void rejectsInvalidEvents()
     {
         QVERIFY(!InputEvent::fromJson({{"t", "pb"}, {"b", 9}}).has_value());

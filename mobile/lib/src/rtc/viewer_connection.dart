@@ -21,8 +21,8 @@ class RemoteScreen {
 }
 
 /// The controlling side of a session: receives the host's screen (and sound,
-/// when the host shares it) through the Cloudflare SFU and sends input,
-/// clipboard and files back over data channels.
+/// which the person at the host turns on and off) through the Cloudflare SFU
+/// and sends input, clipboard and files back over data channels.
 /// Mirrors desktop/resources/web/js/viewer.js.
 class ViewerConnection extends ChangeNotifier implements RemoteInputSink {
   ViewerConnection({
@@ -31,7 +31,6 @@ class ViewerConnection extends ChangeNotifier implements RemoteInputSink {
     required this.peer,
     required this.sendSignal,
     required this.downloadDirectory,
-    this.audioMuted = false,
   });
 
   final ApiClient api;
@@ -52,8 +51,8 @@ class ViewerConnection extends ChangeNotifier implements RemoteInputSink {
   /// True once the host's sound track is being received.
   bool audioAvailable = false;
 
-  /// The user's choice; applied to the sound track as soon as it arrives.
-  bool audioMuted;
+  /// Whether the person at the host currently shares its sound.
+  bool audioEnabled = true;
 
   /// Emitted when the session fails (the owner ends the connection).
   void Function(String reason)? onFailed;
@@ -61,7 +60,8 @@ class ViewerConnection extends ChangeNotifier implements RemoteInputSink {
 
   RTCPeerConnection? _pc;
   RTCDataChannel? _control;
-  MediaStreamTrack? _audioTrack;
+  Timer? _helloTimer;
+  bool _hostAnswered = false;
   bool _started = false;
   bool _closed = false;
 
@@ -73,6 +73,8 @@ class ViewerConnection extends ChangeNotifier implements RemoteInputSink {
         frameSize = size;
         notifyListeners();
       }
+      // Video is playing: the session is up even if a data channel event was missed.
+      if (!size.isEmpty) _markConnected();
     };
     sendSignal({'kind': 'viewer-ready'});
   }
@@ -90,6 +92,7 @@ class ViewerConnection extends ChangeNotifier implements RemoteInputSink {
     final filesName = info['filesChannelName'] as String?;
     final audioName = info['audioTrackName'] as String?;
     inputSupported = info['inputSupported'] != false;
+    audioEnabled = info['audioEnabled'] != false;
 
     final ice = await api.get('/rtc/ice-servers');
     final pc = await createPeerConnection({
@@ -108,8 +111,6 @@ class ViewerConnection extends ChangeNotifier implements RemoteInputSink {
     pc.onTrack = (event) async {
       if (event.track.kind == 'audio') {
         // Remote audio tracks play through the device speaker automatically.
-        _audioTrack = event.track;
-        event.track.enabled = !audioMuted;
         audioAvailable = true;
         notifyListeners();
         return;
@@ -165,13 +166,22 @@ class ViewerConnection extends ChangeNotifier implements RemoteInputSink {
     );
     _control = control;
     control.onMessage = (m) {
-      if (!m.isBinary) _onControlMessage(m.text);
+      if (!m.isBinary) handleControlMessage(m.text);
     };
     control.onDataChannelState = (s) {
-      if (s == RTCDataChannelState.RTCDataChannelOpen) _onControlOpen();
+      if (s == RTCDataChannelState.RTCDataChannelOpen) _sayHello();
       if (s == RTCDataChannelState.RTCDataChannelClosed && state == ViewerState.connected) _fail('Connection closed');
     };
-    if (control.state == RTCDataChannelState.RTCDataChannelOpen) _onControlOpen();
+    // The "open" event of a negotiated channel can be missed on some devices,
+    // so "hello" is repeated until the host answers instead of relying on it.
+    _sayHello();
+    _helloTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (_hostAnswered || _closed || timer.tick > 30) {
+        timer.cancel();
+      } else {
+        _sayHello();
+      }
+    });
 
     // Sound is optional: subscribed last so that a problem with it can never
     // prevent the screen and controls from working.
@@ -189,13 +199,16 @@ class ViewerConnection extends ChangeNotifier implements RemoteInputSink {
     }
   }
 
-  void _onControlOpen() {
-    if (state == ViewerState.connected) return;
-    _sendJson({'t': 'hello'});
+  void _sayHello() => _sendJson({'t': 'hello'});
+
+  /// Leaves the "Connecting…" state once media or a host message arrived.
+  void _markConnected() {
+    if (_closed || state != ViewerState.connecting) return;
     _setState(ViewerState.connected);
   }
 
-  void _onControlMessage(String text) {
+  @visibleForTesting
+  void handleControlMessage(String text) {
     Object? decoded;
     try {
       decoded = jsonDecode(text);
@@ -203,7 +216,11 @@ class ViewerConnection extends ChangeNotifier implements RemoteInputSink {
       return;
     }
     if (decoded is! Map) return;
+    _hostAnswered = true;
+    _markConnected();
     switch (decoded['t']) {
+      case 'audio':
+        _onAudioState(decoded);
       case 'info':
         final list = decoded['screens'];
         screens = [
@@ -213,6 +230,7 @@ class ViewerConnection extends ChangeNotifier implements RemoteInputSink {
         ];
         currentScreen = decoded['current'] is int ? decoded['current'] as int : 0;
         if (decoded['inputSupported'] is bool) inputSupported = decoded['inputSupported'] as bool;
+        if (decoded['audio'] is Map) _onAudioState(decoded['audio'] as Map);
         notifyListeners();
       case 'clip':
         final clip = decoded['text'];
@@ -224,9 +242,9 @@ class ViewerConnection extends ChangeNotifier implements RemoteInputSink {
 
   void requestScreen(int index) => _sendJson({'t': 'screen', 'index': index});
 
-  void setAudioMuted(bool muted) {
-    audioMuted = muted;
-    _audioTrack?.enabled = !muted;
+  /// The person at the host turned its sound on or off.
+  void _onAudioState(Map<dynamic, dynamic> state) {
+    audioEnabled = state['enabled'] != false;
     notifyListeners();
   }
 
@@ -279,8 +297,15 @@ class ViewerConnection extends ChangeNotifier implements RemoteInputSink {
 
   void _sendJson(Map<String, Object?> message) {
     final control = _control;
-    if (control == null || control.state != RTCDataChannelState.RTCDataChannelOpen || !inputAllowed(message)) return;
-    control.send(RTCDataChannelMessage(jsonEncode(message)));
+    if (control == null || !inputAllowed(message)) return;
+    // The reported state can lag behind (see _sayHello), so only a closed
+    // channel is skipped; sending on one that is not open yet is harmless.
+    final channelState = control.state;
+    if (channelState == RTCDataChannelState.RTCDataChannelClosing ||
+        channelState == RTCDataChannelState.RTCDataChannelClosed) {
+      return;
+    }
+    control.send(RTCDataChannelMessage(jsonEncode(message))).catchError((Object _) {});
   }
 
   bool inputAllowed(Map<String, Object?> message) {
@@ -310,7 +335,7 @@ class ViewerConnection extends ChangeNotifier implements RemoteInputSink {
     final pc = _pc;
     _pc = null;
     _control = null;
-    _audioTrack = null;
+    _helloTimer?.cancel();
     audioAvailable = false;
     // Native teardown can stall after a failed connection; never block on it.
     try {

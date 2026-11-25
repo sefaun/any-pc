@@ -14,7 +14,7 @@ import 'net/signaling_client.dart';
 import 'rtc/file_transfer.dart';
 import 'rtc/viewer_connection.dart';
 
-const String appVersion = String.fromEnvironment('APP_VERSION', defaultValue: '1.0.1');
+const String appVersion = String.fromEnvironment('APP_VERSION', defaultValue: '1.0.2');
 
 enum OutgoingState { idle, requesting, waiting }
 
@@ -217,7 +217,6 @@ class AppController extends ChangeNotifier {
       connectionId: connectionId,
       peer: peer,
       downloadDirectory: directory,
-      audioMuted: settings.viewerAudioMuted,
       sendSignal: (payload) => signaling.send(ClientEvent.connectionSignal, {'connectionId': connectionId, 'payload': payload}),
     );
     connection.onFailed = (reason) => endSession(byUser: false, reason: reason);

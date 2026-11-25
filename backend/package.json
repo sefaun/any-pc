@@ -1,6 +1,6 @@
 {
   "name": "anypc-backend",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "AnyPC signaling & Cloudflare Realtime SFU broker",
   "private": true,
   "license": "UNLICENSED",

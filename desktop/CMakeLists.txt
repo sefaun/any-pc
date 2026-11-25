@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.21)
 
 # Version is injected by CI from the git tag (e.g. -DANYPC_VERSION=1.2.3).
-set(ANYPC_VERSION "1.0.1" CACHE STRING "Application version (MAJOR.MINOR.PATCH)")
+set(ANYPC_VERSION "1.0.2" CACHE STRING "Application version (MAJOR.MINOR.PATCH)")
 set(ANYPC_DEFAULT_SERVER_URL "" CACHE STRING "Optional backend URL suggested on first launch (users always confirm it)")
 
 project(AnyPC

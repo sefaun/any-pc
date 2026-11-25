@@ -21,7 +21,7 @@ Flutter ile yazılmış Android ve iOS istemcisi. Telefondan, AnyPC masaüstü u
 - Uzak bilgisayarda birden fazla monitör varsa ekran seçici.
 - İki yönlü dosya aktarımı: Telefondan dosya gönderilir; bilgisayardan gelen dosyalar uygulama klasörüne (`Documents/AnyPC`) kaydedilir ve paylaş menüsüyle açılabilir. iOS'ta Dosyalar uygulamasında "AnyPC" altında da görünür.
 - Pano metnini bilgisayara gönderme; bilgisayardan gelen pano metni telefona kopyalanır.
-- **Ses:** Bilgisayar sesini paylaşıyorsa ses telefonun hoparlöründen medya sesi olarak çalınır. Araç çubuğundaki hoparlör düğmesiyle kapatılıp açılır; seçim hatırlanır.
+- **Ses:** Bilgisayar sesini paylaşıyorsa ses telefonun hoparlöründen medya sesi olarak çalınır. Sesi bilgisayardaki kişi açıp kapatır; araç çubuğundaki hoparlör simgesi sadece durumu gösterir.
 - Karşı taraf bağlantıyı kapatınca bildirim.
 
 Telefonun kendisi uzaktan kontrol edilemez; gelen bağlantı istekleri otomatik reddedilir. Android'de bu özellik ileride Accessibility servisiyle eklenebilir. iOS buna izin vermiyor.

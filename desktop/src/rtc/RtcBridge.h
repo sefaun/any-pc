@@ -49,8 +49,10 @@ public:
     Q_INVOKABLE bool selectScreen(int index);
     /** Viewer only: the host's list of screens ({screens:[{index,name}], current}). */
     Q_INVOKABLE void remoteScreens(const QJsonObject &info);
-    /** Viewer only: whether the host's sound is being received. */
-    Q_INVOKABLE void remoteAudio(bool available);
+    /** Viewer only: whether the host's sound is received and whether the host has it on. */
+    Q_INVOKABLE void remoteAudio(bool available, bool enabled);
+    /** Host only: whether this computer's sound could be captured and whether it is on. */
+    Q_INVOKABLE void audioState(bool available, bool enabled);
 
     // File transfer (see FileTransferManager). Methods returning values are
     // called with a callback from JavaScript.
@@ -79,8 +81,8 @@ Q_SIGNALS:
     void screensUpdated(const QJsonObject &info);
     /** Viewer: the user picked another remote screen. */
     void screenRequested(int index);
-    /** Viewer: mute or unmute the host's sound. */
-    void audioMuted(bool muted);
+    /** Host: the local user turned the shared sound on or off. */
+    void audioEnabled(bool enabled);
 
     // ---- Native side notifications ----------------------------------------------
     void signalToPeer(const QJsonObject &payload);
@@ -89,7 +91,8 @@ Q_SIGNALS:
     void captureChanged(int width, int height, const QByteArray &thumbnail);
     void screenSelectionRequested(int index);
     void remoteScreensReceived(const QJsonObject &info);
-    void remoteAudioAvailable(bool available);
+    void remoteAudioChanged(bool available, bool enabled);
+    void hostAudioChanged(bool available, bool enabled);
     void remoteClipboardReceived(const QString &text);
 
 private:

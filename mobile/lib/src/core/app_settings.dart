@@ -14,7 +14,6 @@ class AppSettings {
   static const _kDeviceSecret = 'deviceSecret';
   static const _kDeviceName = 'deviceName';
   static const _kRecent = 'recentConnections';
-  static const _kViewerAudioMuted = 'viewerAudioMuted';
 
   final SharedPreferences _prefs;
 
@@ -49,11 +48,6 @@ class AppSettings {
   }
 
   Future<void> setDeviceName(String name) => _prefs.setString(_kDeviceName, name.trim());
-
-  /// Last chosen state of the session screen's sound button.
-  bool get viewerAudioMuted => _prefs.getBool(_kViewerAudioMuted) ?? false;
-
-  Future<void> setViewerAudioMuted(bool muted) => _prefs.setBool(_kViewerAudioMuted, muted);
 
   RecentConnectionList get recentConnections => RecentConnectionList.decode(_prefs.getString(_kRecent));
 

@@ -2,7 +2,9 @@
  * Host (controlled side). Runs in an off-screen page:
  *  1. captures a screen (selectable when several monitors are connected);
  *  2. publishes it to the Cloudflare SFU as track "screen", and the computer's
- *     sound (when enabled and supported) as track "audio";
+ *     sound (where it can be captured) as track "audio". The person at this
+ *     computer turns the sound on and off during the session; the viewer is
+ *     told the current state;
  *  3. publishes the "control" and "files" data channels; the viewer subscribes
  *     with `canReply` and sends input events / files back on them;
  *  4. forwards input to native code for injection.
@@ -121,6 +123,7 @@
       this.pc = null;
       this.sender = null;
       this.audio = null;
+      this.audioEnabled = config.audioEnabled !== false;
       this.channel = null;
       this.files = null;
       this.capture = null;
@@ -173,7 +176,7 @@
       this.bridge.reportState('starting', 'Capturing screen');
       const [{ iceServers }, capture] = await Promise.all([
         this.api.iceServers(),
-        this.openCapture(this.config.shareAudio !== false),
+        this.openCapture(this.config.captureAudio !== false),
       ]);
       if (this.stopped) {
         capture.stop();
@@ -190,6 +193,8 @@
       this.sender = transceiver.sender;
       const published = [{ transceiver, trackName: SCREEN_TRACK }];
       if (this.audio) {
+        // A disabled track sends silence; enabling it later needs no renegotiation.
+        this.audio.enabled = this.audioEnabled;
         const audioTransceiver = this.pc.addTransceiver(this.audio, { direction: 'sendonly' });
         published.push({ transceiver: audioTransceiver, trackName: AUDIO_TRACK });
       }
@@ -219,12 +224,14 @@
         kind: 'host-ready',
         trackName: SCREEN_TRACK,
         audioTrackName: this.audio ? AUDIO_TRACK : undefined,
+        audioEnabled: this.audioEnabled,
         dataChannelName: CONTROL_CHANNEL,
         filesChannelName: FILES_CHANNEL,
         platform: this.config.platform,
         inputSupported: this.config.inputSupported,
       };
       this.bridge.reportState('waiting', 'Waiting for the viewer');
+      this.bridge.audioState(Boolean(this.audio), this.audioEnabled);
       this.announce();
     }
 
@@ -267,6 +274,20 @@
       if (this.announcement) this.bridge.sendSignal(this.announcement);
     }
 
+    /** Reports the sound state to native code (the toggle) and to the viewer. */
+    reportAudio() {
+      this.bridge.audioState(Boolean(this.audio), this.audioEnabled);
+      sendJson(this.channel, { t: 'audio', available: Boolean(this.audio), enabled: this.audioEnabled });
+    }
+
+    /** The person at this computer turned the sound on or off. */
+    setAudioEnabled(enabled) {
+      this.audioEnabled = enabled;
+      if (this.audio) this.audio.enabled = enabled;
+      this.log.info(`Sound ${enabled ? 'on' : 'off'}`);
+      this.reportAudio();
+    }
+
     sendInfo() {
       sendJson(this.channel, {
         t: 'info',
@@ -274,6 +295,7 @@
         inputSupported: this.config.inputSupported,
         screens: this.screens.screens || [],
         current: this.screens.current || 0,
+        audio: { available: Boolean(this.audio), enabled: this.audioEnabled },
       });
     }
 
@@ -351,6 +373,7 @@
     });
     bridge.peerSignal.connect((payload) => controller && controller.onPeerSignal(payload));
     bridge.localClipboard.connect((text) => controller && controller.sendClipboard(text));
+    bridge.audioEnabled.connect((enabled) => controller && controller.setAudioEnabled(enabled));
     bridge.stop.connect(() => controller && controller.stop());
     bridge.pageReady();
   })();

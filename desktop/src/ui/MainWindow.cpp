@@ -27,6 +27,7 @@
 #include <QMessageBox>
 #include <QPushButton>
 #include <QRegularExpressionValidator>
+#include <QSignalBlocker>
 #include <QStatusBar>
 #include <QStringListModel>
 #include <QStyle>
@@ -121,6 +122,7 @@ MainWindow::MainWindow(AppSettings *settings, SessionManager *sessions, QWidget 
             m_tray->showMessage(windowTitle(), tr("%1 is now controlling this computer.").arg(viewer.name));
     });
     connect(m_sessions, &SessionManager::hostSessionEnded, m_controlBanner, &QWidget::hide);
+    connect(m_sessions, &SessionManager::hostSessionEnded, m_soundButton, &QWidget::hide);
     connect(m_sessions, &SessionManager::notification, this, &MainWindow::showMessage);
     connect(m_sessions, &SessionManager::sessionEndedRemotely, this, &MainWindow::notifySessionEnded);
     connect(m_sessions, &SessionManager::permissionRequired, this, [this](const QString &text, const QString &details) {
@@ -257,14 +259,40 @@ QFrame *MainWindow::buildControlBanner()
     connect(sendFiles, &QPushButton::clicked, this, [this]() { m_sessions->sendFilesToViewer(this); });
     auto *transfers = new QPushButton(tr("Transfers"), banner);
     connect(transfers, &QPushButton::clicked, m_sessions, &SessionManager::showHostTransfers);
+    // The person at this computer decides whether the viewer hears its sound.
+    m_soundButton = new QPushButton(banner);
+    m_soundButton->setCheckable(true);
+    m_soundButton->hide();
+    connect(m_soundButton, &QPushButton::toggled, this, [this](bool on) {
+        updateSoundButton();
+        m_sessions->setHostAudioEnabled(on);
+        showMessage(on ? tr("The viewer now hears this computer's sound.")
+                       : tr("This computer's sound is no longer shared."));
+    });
+    connect(m_sessions, &SessionManager::hostAudioStateChanged, this, [this](bool available, bool enabled) {
+        const QSignalBlocker blocker(m_soundButton);
+        m_soundButton->setChecked(enabled);
+        m_soundButton->setVisible(available);
+        updateSoundButton();
+    });
     auto *end = new QPushButton(tr("Disconnect"), banner);
     connect(end, &QPushButton::clicked, m_sessions, &SessionManager::endHostSession);
     layout->addWidget(m_controlLabel, 1);
+    layout->addWidget(m_soundButton);
     layout->addWidget(sendFiles);
     layout->addWidget(transfers);
     layout->addWidget(end);
     banner->hide();
     return banner;
+}
+
+void MainWindow::updateSoundButton()
+{
+    const bool on = m_soundButton->isChecked();
+    m_soundButton->setIcon(style()->standardIcon(on ? QStyle::SP_MediaVolume : QStyle::SP_MediaVolumeMuted));
+    m_soundButton->setText(on ? tr("Sound on") : tr("Sound off"));
+    m_soundButton->setToolTip(on ? tr("The viewer hears this computer's sound. Click to stop sharing it.")
+                                 : tr("This computer's sound is not shared. Click to share it."));
 }
 
 void MainWindow::setupMenus()

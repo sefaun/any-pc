@@ -57,6 +57,12 @@ HostSession::HostSession(const QString &connectionId, const protocol::DeviceSumm
             m_injector->handle(*event);
     });
     connect(bridge(), &RtcBridge::captureChanged, this, &HostSession::onCaptureChanged);
+    m_audioEnabled = settings->shareAudioEnabled();
+    connect(bridge(), &RtcBridge::hostAudioChanged, this, [this](bool available, bool enabled) {
+        m_audioAvailable = available;
+        m_audioEnabled = enabled;
+        Q_EMIT audioStateChanged(available, enabled);
+    });
     connect(bridge(), &RtcBridge::screenSelectionRequested, this, [this](int index) {
         if (page())
             page()->setScreenIndex(index);
@@ -128,6 +134,12 @@ void HostSession::hideOverlays()
         overlay->hide();
 }
 
+void HostSession::setAudioEnabled(bool enabled)
+{
+    m_audioEnabled = enabled;
+    Q_EMIT bridge()->audioEnabled(enabled);
+}
+
 QUrl HostSession::appUrl() const
 {
     return QUrl(QStringLiteral("qrc:/web/host.html"));
@@ -145,7 +157,8 @@ QJsonObject HostSession::startConfig() const
                      {QStringLiteral("frameRate"), kMaxFrameRate},
                      {QStringLiteral("maxBitrate"), kMaxBitrateBps}}},
         {QStringLiteral("inputSupported"), m_injector->isSupported()},
-        {QStringLiteral("shareAudio"), kSystemAudioSupported && settings()->shareAudioEnabled()},
+        {QStringLiteral("captureAudio"), kSystemAudioSupported},
+        {QStringLiteral("audioEnabled"), m_audioEnabled},
     };
 }
 

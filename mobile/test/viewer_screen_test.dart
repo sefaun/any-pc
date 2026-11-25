@@ -42,4 +42,21 @@ void main() {
     expect(find.text('Disconnect?'), findsNothing);
     expect(find.text('open'), findsOneWidget);
   });
+
+  test('the host controls the sound and its messages are understood', () {
+    final connection = ViewerConnection(
+      api: ApiClient(),
+      connectionId: 'c2',
+      peer: const DeviceSummary(id: '123456789', name: 'Office PC', platform: 'windows'),
+      sendSignal: (_) {},
+      downloadDirectory: Directory.systemTemp,
+    );
+    expect(connection.audioEnabled, isTrue);
+    connection.handleControlMessage('{"t":"audio","available":true,"enabled":false}');
+    expect(connection.audioEnabled, isFalse);
+    connection.handleControlMessage('{"t":"info","screens":[],"current":0,"audio":{"available":true,"enabled":true}}');
+    expect(connection.audioEnabled, isTrue);
+    connection.handleControlMessage('not json');
+    expect(connection.audioEnabled, isTrue);
+  });
 }

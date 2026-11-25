@@ -30,7 +30,7 @@ SettingsDialog::SettingsDialog(AppSettings *settings, QWidget *parent)
     , m_passwordState(new QLabel(this))
     , m_clearPassword(new QCheckBox(tr("Disable unattended access"), this))
     , m_clipboardSync(new QCheckBox(tr("Synchronise clipboard text during sessions"), this))
-    , m_shareAudio(new QCheckBox(tr("Share this computer's sound when it is being controlled"), this))
+    , m_shareAudio(new QCheckBox(tr("Share this computer's sound when it is being controlled (can be turned off during a session)"), this))
     , m_minimizeToTray(new QCheckBox(tr("Keep running in the system tray when the window is closed"), this))
 {
     setWindowTitle(tr("Settings"));

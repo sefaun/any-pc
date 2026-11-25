@@ -39,15 +39,11 @@ ViewerWindow::ViewerWindow(const QString &title, QWidget *parent)
     toolbar->addAction(style()->standardIcon(QStyle::SP_FileDialogListView), tr("Transfers"), this,
                        &ViewerWindow::showTransfersRequested);
 
-    // Checked = muted. Hidden until the host's sound arrives (it may not share sound).
+    // Indicator only: the person at the remote computer controls its sound.
+    // Hidden until the sound arrives (the remote computer may not share any).
     m_audioAction = toolbar->addAction(QString());
-    m_audioAction->setCheckable(true);
+    m_audioAction->setEnabled(false);
     m_audioAction->setVisible(false);
-    connect(m_audioAction, &QAction::toggled, this, [this](bool muted) {
-        updateAudioAction();
-        Q_EMIT audioMuteToggled(muted);
-        m_view->setFocus();
-    });
     updateAudioAction();
 
     toolbar->addSeparator();
@@ -119,21 +115,11 @@ void ViewerWindow::setRemoteScreens(const QJsonObject &info)
     m_screensAction->setVisible(m_screens->count() > 1);
 }
 
-void ViewerWindow::setAudioAvailable(bool available)
+void ViewerWindow::setRemoteAudio(bool available, bool enabled)
 {
+    m_remoteAudioEnabled = enabled;
     m_audioAction->setVisible(available);
-}
-
-void ViewerWindow::setAudioMuted(bool muted)
-{
-    const QSignalBlocker blocker(m_audioAction);
-    m_audioAction->setChecked(muted);
     updateAudioAction();
-}
-
-bool ViewerWindow::isAudioMuted() const
-{
-    return m_audioAction->isChecked();
 }
 
 bool ViewerWindow::isAudioAvailable() const
@@ -143,11 +129,11 @@ bool ViewerWindow::isAudioAvailable() const
 
 void ViewerWindow::updateAudioAction()
 {
-    const bool muted = m_audioAction->isChecked();
-    m_audioAction->setIcon(style()->standardIcon(muted ? QStyle::SP_MediaVolumeMuted : QStyle::SP_MediaVolume));
-    m_audioAction->setText(muted ? tr("Sound off") : tr("Sound on"));
-    m_audioAction->setToolTip(muted ? tr("The remote computer's sound is muted. Click to turn it on.")
-                                    : tr("Playing the remote computer's sound. Click to mute it."));
+    const bool on = m_remoteAudioEnabled;
+    m_audioAction->setIcon(style()->standardIcon(on ? QStyle::SP_MediaVolume : QStyle::SP_MediaVolumeMuted));
+    m_audioAction->setText(on ? tr("Sound on") : tr("Sound off"));
+    m_audioAction->setToolTip(on ? tr("Playing the remote computer's sound.")
+                                 : tr("The person at the remote computer turned its sound off."));
 }
 
 void ViewerWindow::toggleFullScreen()

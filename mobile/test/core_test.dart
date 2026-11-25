@@ -1,9 +1,7 @@
-import 'package:anypc_mobile/src/core/app_settings.dart';
 import 'package:anypc_mobile/src/core/device_id.dart';
 import 'package:anypc_mobile/src/core/recent_connections.dart';
 import 'package:anypc_mobile/src/core/server_url.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
   group('DeviceId', () {
@@ -85,13 +83,5 @@ void main() {
       expect(RecentConnectionList.decode('not json').entries, isEmpty);
       expect(RecentConnectionList.decode('[{"id":"bad"},{"id":"123456789"}]').entries.single.id, '123456789');
     });
-  });
-
-  test('viewer sound mute choice is remembered', () async {
-    SharedPreferences.setMockInitialValues({});
-    final settings = await AppSettings.load();
-    expect(settings.viewerAudioMuted, isFalse);
-    await settings.setViewerAudioMuted(true);
-    expect((await AppSettings.load()).viewerAudioMuted, isTrue);
   });
 }

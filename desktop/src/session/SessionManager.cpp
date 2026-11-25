@@ -195,7 +195,9 @@ void SessionManager::onAccepted(const QString &connectionId, protocol::Role role
             clearOutgoing();
         startSession(new ViewerSession(connectionId, peer, m_api, m_settings, this));
     } else {
-        startSession(new HostSession(connectionId, peer, m_api, m_settings, this));
+        auto *host = new HostSession(connectionId, peer, m_api, m_settings, this);
+        connect(host, &HostSession::audioStateChanged, this, &SessionManager::hostAudioStateChanged);
+        startSession(host);
         Q_EMIT hostSessionStarted(peer);
     }
 }
@@ -272,6 +274,15 @@ void SessionManager::showHostTransfers()
             session->showFileTransfers();
             return;
         }
+    }
+}
+
+void SessionManager::setHostAudioEnabled(bool enabled)
+{
+    m_settings->setShareAudioEnabled(enabled);
+    for (RtcSession *session : std::as_const(m_sessions)) {
+        if (auto *host = qobject_cast<HostSession *>(session))
+            host->setAudioEnabled(enabled);
     }
 }
 

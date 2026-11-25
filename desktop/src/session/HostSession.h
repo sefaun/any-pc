@@ -29,6 +29,15 @@ public:
 
     protocol::Role role() const override { return protocol::Role::Host; }
 
+    /** Whether this computer's sound is captured, and whether it is currently shared. */
+    bool isAudioAvailable() const { return m_audioAvailable; }
+    bool isAudioEnabled() const { return m_audioEnabled; }
+    /** Turns the shared sound on or off for the viewer (live, no reconnection). */
+    void setAudioEnabled(bool enabled);
+
+Q_SIGNALS:
+    void audioStateChanged(bool available, bool enabled);
+
 protected:
     QUrl appUrl() const override;
     QJsonObject startConfig() const override;
@@ -46,6 +55,8 @@ private:
     /** Screens shown in the capture (several when the whole desktop is captured). */
     QList<QPointer<QScreen>> m_sharedScreens;
     bool m_connected = false;
+    bool m_audioAvailable = false;
+    bool m_audioEnabled = true;
 };
 
 } // namespace anypc

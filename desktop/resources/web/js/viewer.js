@@ -2,7 +2,7 @@
  * Viewer (controlling side):
  *  1. waits for the host's "host-ready" announcement;
  *  2. subscribes to the published screen track (and the sound track, when the
- *     host shares its sound);
+ *     host can share its sound; the person at the host turns it on and off);
  *  3. subscribes to the host's "control" data channel with `canReply`
  *     and streams keyboard/mouse input back on it.
  */
@@ -143,6 +143,7 @@
       this.channel = null;
       this.started = false;
       this.stopped = false;
+      this.audio = { received: false, enabled: true };
       this.input = new InputCapture(ui.video, (message) => sendJson(this.channel, message));
     }
 
@@ -160,6 +161,7 @@
 
     async connect(info) {
       this.ui.setStatus('Connecting…');
+      this.audio.enabled = info.audioEnabled !== false;
       const { iceServers } = await this.api.iceServers();
       this.pc = new RTCPeerConnection({ iceServers, bundlePolicy: 'max-bundle' });
       this.pc.addEventListener('connectionstatechange', () => {
@@ -169,9 +171,9 @@
         this.log.info('Remote track received', event.track.kind);
         if (event.track.kind === 'audio') {
           this.ui.audio.srcObject = new MediaStream([event.track]);
-          this.ui.audio.muted = this.config.audioMuted === true;
           this.ui.audio.play().catch((error) => this.log.warn('Sound playback failed', error));
-          this.bridge.remoteAudio(true);
+          this.audio.received = true;
+          this.reportAudio();
           return;
         }
         this.ui.video.srcObject = new MediaStream([event.track]);
@@ -222,15 +224,22 @@
       if (!message) return;
       if (message.t === 'info') {
         this.bridge.remoteScreens({ screens: Array.isArray(message.screens) ? message.screens : [], current: message.current || 0 });
+        if (message.audio) this.onAudioState(message.audio);
+      } else if (message.t === 'audio') {
+        this.onAudioState(message);
       } else if (message.t === 'clip' && typeof message.text === 'string') {
         this.bridge.remoteClipboard(message.text.slice(0, MAX_CLIPBOARD_LENGTH));
       }
     }
 
-    setAudioMuted(muted) {
-      this.config.audioMuted = muted;
-      this.ui.audio.muted = muted;
-      if (!muted) this.ui.audio.play().catch(() => {});
+    /** The host turned its sound on or off. */
+    onAudioState(state) {
+      this.audio.enabled = state.enabled !== false;
+      this.reportAudio();
+    }
+
+    reportAudio() {
+      this.bridge.remoteAudio(this.audio.received, this.audio.enabled);
     }
 
     requestScreen(index) {
@@ -257,7 +266,7 @@
       this.pc = null;
       this.ui.video.srcObject = null;
       this.ui.audio.srcObject = null;
-      this.bridge.remoteAudio(false);
+      this.bridge.remoteAudio(false, false);
     }
   }
 
@@ -294,7 +303,6 @@
     bridge.peerSignal.connect((payload) => controller && controller.onPeerSignal(payload));
     bridge.localClipboard.connect((text) => controller && controller.sendClipboard(text));
     bridge.screenRequested.connect((index) => controller && controller.requestScreen(index));
-    bridge.audioMuted.connect((muted) => controller && controller.setAudioMuted(muted));
     bridge.stop.connect(() => controller && controller.stop());
     bridge.pageReady();
   })();

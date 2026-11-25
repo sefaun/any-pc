@@ -43,6 +43,7 @@ private:
     QWidget *buildLocalCard();
     QWidget *buildRemoteCard();
     QFrame *buildControlBanner();
+    void updateSoundButton();
     void setupMenus();
     void setupTray();
     void refreshUnattendedLabel();
@@ -70,6 +71,7 @@ private:
     QFrame *m_controlBanner = nullptr;
     RecentConnectionsView *m_recentView = nullptr;
     QLabel *m_controlLabel = nullptr;
+    QPushButton *m_soundButton = nullptr;
     QLabel *m_statusDot = nullptr;
     QLabel *m_statusText = nullptr;
     QSystemTrayIcon *m_tray = nullptr;

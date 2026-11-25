@@ -96,9 +96,14 @@ void RtcBridge::remoteScreens(const QJsonObject &info)
     Q_EMIT remoteScreensReceived(info);
 }
 
-void RtcBridge::remoteAudio(bool available)
+void RtcBridge::remoteAudio(bool available, bool enabled)
 {
-    Q_EMIT remoteAudioAvailable(available);
+    Q_EMIT remoteAudioChanged(available, enabled);
+}
+
+void RtcBridge::audioState(bool available, bool enabled)
+{
+    Q_EMIT hostAudioChanged(available, enabled);
 }
 
 void RtcBridge::fileChannelReady(bool ready)

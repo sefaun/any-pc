@@ -42,6 +42,8 @@ public:
     /** Host side: send files to the controlling device / show transfers. */
     void sendFilesToViewer(QWidget *dialogParent);
     void showHostTransfers();
+    /** Host side: turn this computer's shared sound on or off (also the default for next sessions). */
+    void setHostAudioEnabled(bool enabled);
 
     void endAll();
 
@@ -52,6 +54,8 @@ Q_SIGNALS:
     void outgoingFinished();
     void hostSessionStarted(const anypc::protocol::DeviceSummary &viewer);
     void hostSessionEnded();
+    /** Host side: whether the sound is captured and whether it is currently shared. */
+    void hostAudioStateChanged(bool available, bool enabled);
     /** A session ended without the local user asking for it (peer left, network, ...). */
     void sessionEndedRemotely(const anypc::protocol::DeviceSummary &peer, anypc::protocol::Role role,
                               const QString &reason);

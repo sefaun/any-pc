@@ -51,13 +51,9 @@ public:
     bool clipboardSyncEnabled() const;
     void setClipboardSyncEnabled(bool enabled);
 
-    /** Host: send this computer's sound along with the screen. */
+    /** Host: whether this computer's sound is on when a session starts (it can be toggled during the session). */
     bool shareAudioEnabled() const;
     void setShareAudioEnabled(bool enabled);
-
-    /** Viewer: last chosen state of the session window's sound button. */
-    bool viewerAudioMuted() const;
-    void setViewerAudioMuted(bool muted);
 
     /** Locally stored history of outgoing connections. */
     RecentConnections *recentConnections() const { return m_recent; }

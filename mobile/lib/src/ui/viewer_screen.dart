@@ -136,12 +136,6 @@ class _ViewerScreenState extends State<ViewerScreen> {
 
   // ---- Commands ------------------------------------------------------------------------------
 
-  void _toggleAudio() {
-    final muted = !_connection.audioMuted;
-    _connection.setAudioMuted(muted);
-    AppScope.read(context).settings.setViewerAudioMuted(muted);
-  }
-
   Future<void> _sendFiles() async {
     final picked = await FilePicker.pickFiles(dialogTitle: 'Send files to ${_connection.peer.name}');
     for (final file in picked) {
@@ -293,11 +287,14 @@ class _ViewerScreenState extends State<ViewerScreen> {
               selected: _touch.scrollMode,
               onPressed: () => setState(() => _touch.scrollMode = !_touch.scrollMode),
             ),
+            // The person at the computer turns its sound on and off; this only shows the state.
             if (connection.audioAvailable)
-              _ToolButton(
-                icon: connection.audioMuted ? Icons.volume_off : Icons.volume_up,
-                tooltip: connection.audioMuted ? 'Sound off' : 'Sound on',
-                onPressed: _toggleAudio,
+              Tooltip(
+                message: connection.audioEnabled ? 'Sound on' : 'Sound turned off on the computer',
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 8),
+                  child: Icon(connection.audioEnabled ? Icons.volume_up : Icons.volume_off, color: Colors.white70),
+                ),
               ),
             if (_touch.transform.scale > 1.01)
               _ToolButton(icon: Icons.zoom_out_map, tooltip: 'Reset zoom', onPressed: _touch.resetZoom),

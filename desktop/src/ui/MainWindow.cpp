@@ -123,6 +123,17 @@ MainWindow::MainWindow(AppSettings *settings, SessionManager *sessions, QWidget 
     connect(m_sessions, &SessionManager::hostSessionEnded, m_controlBanner, &QWidget::hide);
     connect(m_sessions, &SessionManager::notification, this, &MainWindow::showMessage);
     connect(m_sessions, &SessionManager::sessionEndedRemotely, this, &MainWindow::notifySessionEnded);
+    connect(m_sessions, &SessionManager::permissionRequired, this, [this](const QString &text, const QString &details) {
+        if (m_tray)
+            m_tray->showMessage(windowTitle(), text, QSystemTrayIcon::Warning, 8000);
+        auto *box = new QMessageBox(QMessageBox::Warning, tr("Permission required"), text, QMessageBox::Ok, this);
+        box->setInformativeText(details);
+        box->setAttribute(Qt::WA_DeleteOnClose);
+        box->setWindowModality(Qt::NonModal);
+        box->show();
+        box->raise();
+        QApplication::alert(box);
+    });
 }
 
 QWidget *MainWindow::buildLocalCard()

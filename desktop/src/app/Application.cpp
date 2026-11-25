@@ -2,6 +2,7 @@
 
 #include "BuildInfo.h"
 #include "core/AppSettings.h"
+#include "core/ScreenCapturePermission.h"
 #include "network/ApiClient.h"
 #include "network/SignalingClient.h"
 #include "session/SessionManager.h"
@@ -84,6 +85,10 @@ bool Application::start()
     }
     m_api->setBaseUrl(m_settings->serverUrl());
     m_window->show();
+    // macOS: ask for Screen Recording access up front (the system prompt is
+    // shown once), so the first incoming connection does not fail.
+    if (!ScreenCapturePermission::isGranted())
+        ScreenCapturePermission::request();
     authenticate();
     return true;
 }

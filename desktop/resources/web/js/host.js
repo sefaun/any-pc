@@ -21,6 +21,31 @@
     return new Promise((resolve) => method(...args, resolve));
   }
 
+  const AUDIO_CAPTURE_TIMEOUT_MS = 8000;
+
+  /**
+   * Like captureScreen(config, true), but gives up after a few seconds: a sound
+   * capture that never answers must not hold up the session. A capture that
+   * succeeds after the timeout is stopped right away.
+   */
+  function captureScreenWithAudio(config) {
+    let timedOut = false;
+    const capture = captureScreen(config, true);
+    capture.then(
+      (stream) => timedOut && stream.getTracks().forEach((track) => track.stop()),
+      () => {},
+    );
+    return Promise.race([
+      capture,
+      new Promise((_, reject) =>
+        setTimeout(() => {
+          timedOut = true;
+          reject(new Error('System sound capture timed out'));
+        }, AUDIO_CAPTURE_TIMEOUT_MS),
+      ),
+    ]);
+  }
+
   /**
    * Captures the screen. With `withAudio`, the system sound ("loopback") is
    * requested in the same call; Chromium only offers it together with a desktop
@@ -114,7 +139,7 @@
       let stream = null;
       if (withAudio) {
         try {
-          stream = await captureScreen(this.config.capture, true);
+          stream = await captureScreenWithAudio(this.config.capture);
           const audioTrack = stream.getAudioTracks()[0];
           if (audioTrack && audioTrack.readyState === 'live') {
             audioTrack.contentHint = 'music';

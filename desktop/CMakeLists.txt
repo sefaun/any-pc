@@ -40,6 +40,7 @@ set(ANYPC_LIB_SOURCES
     src/core/Logging.cpp               src/core/Logging.h
     src/core/PasswordHasher.cpp        src/core/PasswordHasher.h
     src/core/RecentConnections.cpp     src/core/RecentConnections.h
+    src/core/ScreenCapturePermission.h
     src/network/ApiClient.cpp          src/network/ApiClient.h
     src/network/SignalingClient.cpp    src/network/SignalingClient.h
     src/network/Protocol.h
@@ -73,11 +74,11 @@ add_library(anypc_qrcodegen STATIC src/third_party/qrcodegen/qrcodegen.cpp src/t
 set_target_properties(anypc_qrcodegen PROPERTIES AUTOMOC OFF)
 
 if(WIN32)
-    list(APPEND ANYPC_LIB_SOURCES src/input/platform/WindowsInputInjector.cpp)
+    list(APPEND ANYPC_LIB_SOURCES src/input/platform/WindowsInputInjector.cpp src/core/ScreenCapturePermission.cpp)
 elseif(APPLE)
-    list(APPEND ANYPC_LIB_SOURCES src/input/platform/MacInputInjector.mm)
+    list(APPEND ANYPC_LIB_SOURCES src/input/platform/MacInputInjector.mm src/core/ScreenCapturePermission.mm)
 else()
-    list(APPEND ANYPC_LIB_SOURCES src/input/platform/X11InputInjector.cpp)
+    list(APPEND ANYPC_LIB_SOURCES src/input/platform/X11InputInjector.cpp src/core/ScreenCapturePermission.cpp)
 endif()
 
 add_library(anypc_lib STATIC ${ANYPC_LIB_SOURCES})

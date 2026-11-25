@@ -192,7 +192,7 @@ Her release'te şu dosyalar yayınlanır:
 
 | Platform | Not |
 | --- | --- |
-| **macOS** | İlk bağlantıda *Ekran Kaydı* ve *Erişilebilirlik* izinleri istenir (Sistem Ayarları → Gizlilik ve Güvenlik). Build ad-hoc imzalıdır; Gatekeeper uyarısında uygulamaya sağ tıklayıp *Aç* deyin. Dağıtım için Developer ID imzası + notarization ekleyin (`packaging/macos/build-dmg.sh`). |
+| **macOS** | Uygulama açılışta *Ekran Kaydı*, ilk kontrol edilişte *Erişilebilirlik* iznini ister (Sistem Ayarları → Gizlilik ve Güvenlik). Ekran Kaydı izni yokken gelen bağlantılar reddedilir ve ne yapılacağı ekranda anlatılır; izin verdikten sonra AnyPC'yi yeniden başlatın. Build ad-hoc imzalı olduğu için her yeni sürümden sonra bu izinleri listeden kaldırıp yeniden vermek gerekebilir. Build ad-hoc imzalıdır; Gatekeeper uyarısında uygulamaya sağ tıklayıp *Aç* deyin. Dağıtım için Developer ID imzası + notarization ekleyin (`packaging/macos/build-dmg.sh`). |
 | **Windows** | UIPI kuralı gereği yönetici olarak çalışan pencerelere input gönderebilmek için AnyPC'nin de yönetici olarak çalışması gerekir. UAC onay ekranı ve kilit ekranı (secure desktop) yakalanamaz. Installer imzasızdır, SmartScreen uyarı verebilir. |
 | **Linux** | Uzaktan kontrol için **X11** oturumu gerekir (XTest). Wayland'de ekran görüntülenebilir ama input enjeksiyonu desteklenmez; viewer "view only" moduna geçer. |
 

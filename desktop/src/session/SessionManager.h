@@ -56,6 +56,8 @@ Q_SIGNALS:
     void sessionEndedRemotely(const anypc::protocol::DeviceSummary &peer, anypc::protocol::Role role,
                               const QString &reason);
     void notification(const QString &message);
+    /** Something the user must fix before others can connect (shown prominently). */
+    void permissionRequired(const QString &text, const QString &details);
 
 private:
     void onIncoming(const QString &connectionId, const protocol::DeviceSummary &from, const QString &password,

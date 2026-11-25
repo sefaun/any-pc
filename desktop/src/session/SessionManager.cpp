@@ -3,6 +3,7 @@
 #include "core/AppSettings.h"
 #include "core/DeviceId.h"
 #include "core/RecentConnections.h"
+#include "core/ScreenCapturePermission.h"
 #include "network/SignalingClient.h"
 #include "session/HostSession.h"
 #include "session/ViewerSession.h"
@@ -147,6 +148,18 @@ void SessionManager::onIncoming(const QString &connectionId, const protocol::Dev
     if (isBeingControlled()) {
         qCInfo(lcSessions) << "Rejecting" << from.id << "- already being controlled";
         m_signaling->respondToConnection(connectionId, false);
+        return;
+    }
+    if (!ScreenCapturePermission::isGranted()) {
+        // Accepting would only end in a failed capture; explain it instead.
+        qCWarning(lcSessions) << "Rejecting" << from.id << "- no screen recording permission";
+        m_signaling->respondToConnection(connectionId, false);
+        ScreenCapturePermission::request();
+        Q_EMIT permissionRequired(
+            tr("%1 (%2) tried to connect, but AnyPC is not allowed to record this screen.")
+                .arg(from.name, DeviceId::format(from.id)),
+            tr("Open System Settings > Privacy & Security > Screen Recording, turn on AnyPC and "
+               "restart AnyPC. Then connect again."));
         return;
     }
     if (!password.isEmpty()) {

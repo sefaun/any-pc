@@ -33,6 +33,18 @@ QString platformName()
     return QStringLiteral("linux");
 #endif
 }
+
+/**
+ * System sound is captured with Chromium's loopback device, which exists on
+ * Windows and Linux only. On macOS the attempt is skipped entirely so that it
+ * cannot disturb the screen capture.
+ */
+constexpr bool kSystemAudioSupported =
+#if defined(Q_OS_MACOS)
+    false;
+#else
+    true;
+#endif
 } // namespace
 
 HostSession::HostSession(const QString &connectionId, const protocol::DeviceSummary &peer, ApiClient *api,
@@ -133,7 +145,7 @@ QJsonObject HostSession::startConfig() const
                      {QStringLiteral("frameRate"), kMaxFrameRate},
                      {QStringLiteral("maxBitrate"), kMaxBitrateBps}}},
         {QStringLiteral("inputSupported"), m_injector->isSupported()},
-        {QStringLiteral("shareAudio"), settings()->shareAudioEnabled()},
+        {QStringLiteral("shareAudio"), kSystemAudioSupported && settings()->shareAudioEnabled()},
     };
 }
 

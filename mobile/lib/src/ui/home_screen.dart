@@ -78,8 +78,10 @@ class _HomeScreenState extends State<HomeScreen> {
     FocusScope.of(context).unfocus();
     final id = await QrScannerScreen.scan(context);
     if (id == null || !mounted) return;
+    // A scanned code is an explicit choice: send the connection request right away
+    // (with the password field's content, if any).
     _address.text = DeviceId.format(id);
-    _showMessage('Address ${DeviceId.format(id)} scanned.');
+    _connect();
   }
 
   @override
@@ -104,6 +106,7 @@ class _HomeScreenState extends State<HomeScreen> {
             onSelected: (value) => _onMenu(value, controller),
             itemBuilder: (context) => const [
               PopupMenuItem(value: 'qr', child: Text('My QR code')),
+              PopupMenuItem(value: 'newId', child: Text('Get a new address')),
               PopupMenuItem(value: 'server', child: Text('Change server')),
               PopupMenuItem(value: 'name', child: Text('Device name')),
               PopupMenuItem(value: 'about', child: Text('About')),
@@ -141,6 +144,25 @@ class _HomeScreenState extends State<HomeScreen> {
         } else {
           await showDeviceQrSheet(context, deviceId: id, title: 'This phone');
         }
+      case 'newId':
+        final current = controller.deviceId;
+        if (current == null || !controller.isOnline) {
+          _showMessage('Connect to the server first.');
+          return;
+        }
+        final ok = await showDialog<bool>(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Text('Get a new address'),
+            content: Text('Give this phone a new random address?\n\n'
+                'The current address ${DeviceId.format(current)} stops working right away.'),
+            actions: [
+              TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
+              FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('New address')),
+            ],
+          ),
+        );
+        if (ok == true) await controller.changeDeviceId();
       case 'server':
         await Navigator.of(context).push(
           MaterialPageRoute<void>(builder: (_) => SetupScreen(initial: controller.serverUrl, popOnSave: true)),

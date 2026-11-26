@@ -36,6 +36,10 @@ public:
     void showMessage(const QString &message);
     void bringToFront();
 
+Q_SIGNALS:
+    /** The user confirmed that this computer should get a new random address. */
+    void changeDeviceIdRequested();
+
 protected:
     void closeEvent(QCloseEvent *event) override;
 

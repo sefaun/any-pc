@@ -164,8 +164,26 @@ QWidget *MainWindow::buildLocalCard()
         QGuiApplication::clipboard()->setText(m_rawDeviceId);
         showMessage(tr("Address copied to clipboard."));
     });
+    auto *change = new QToolButton(card);
+    change->setIcon(style()->standardIcon(QStyle::SP_BrowserReload));
+    change->setToolTip(tr("Get a new address"));
+    connect(change, &QToolButton::clicked, this, [this]() {
+        if (m_rawDeviceId.isEmpty() || !m_connectButton->isEnabled()) {
+            showMessage(tr("Connect to the server first."));
+            return;
+        }
+        const auto answer = QMessageBox::question(
+            this, tr("Get a new address"),
+            tr("Give this computer a new random address?\n\nThe current address %1 stops working right away: "
+               "anyone who saved it can no longer connect, and active sessions end.")
+                .arg(DeviceId::format(m_rawDeviceId)),
+            QMessageBox::Yes | QMessageBox::Cancel, QMessageBox::Cancel);
+        if (answer == QMessageBox::Yes)
+            Q_EMIT changeDeviceIdRequested();
+    });
     idRow->addWidget(m_deviceId);
     idRow->addWidget(copy);
+    idRow->addWidget(change);
     idRow->addStretch();
     info->addLayout(idRow);
 

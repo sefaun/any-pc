@@ -2,6 +2,11 @@
 
 namespace anypc::ScreenCapturePermission {
 
+bool isRestricted()
+{
+    return false;
+}
+
 bool isGranted()
 {
     return true;

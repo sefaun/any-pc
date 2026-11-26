@@ -1,4 +1,5 @@
 import { Injectable, Logger, OnModuleInit, UnauthorizedException } from '@nestjs/common';
+import { Subject, type Observable } from 'rxjs';
 import { StorageService } from '../storage/storage.service';
 import type { JsonFileStore } from '../storage/json-file-store';
 import {
@@ -15,10 +16,21 @@ export interface RegistrationResult {
   issuedSecret?: string;
 }
 
+export interface DeviceIdChange {
+  oldId: string;
+  newId: string;
+}
+
 @Injectable()
 export class DevicesService implements OnModuleInit {
   private readonly logger = new Logger(DevicesService.name);
   private store: JsonFileStore<DeviceRecord>;
+  private readonly idChanges = new Subject<DeviceIdChange>();
+
+  /** Emitted after a device moved to a new address (see changeId). */
+  get idChanges$(): Observable<DeviceIdChange> {
+    return this.idChanges.asObservable();
+  }
 
   constructor(private readonly storage: StorageService) {}
 
@@ -66,6 +78,26 @@ export class DevicesService implements OnModuleInit {
     const device = await this.create(this.allocateId(), secret, dto, now);
     this.logger.log(`Registered new device ${device.id} (${device.platform})`);
     return { device, issuedSecret: secret };
+  }
+
+  /**
+   * Moves a device to a new random address. The secret stays the same; the old
+   * address stops existing immediately, so nobody can reach the device under
+   * it any more and its old access tokens are no longer accepted.
+   */
+  changeId(oldId: string): DeviceRecord {
+    const existing = this.store.get(oldId);
+    if (!existing) throw new UnauthorizedException('Unknown device');
+    const moved: DeviceRecord = {
+      ...existing,
+      id: this.allocateId(),
+      lastSeenAt: new Date().toISOString(),
+    };
+    this.store.set(moved.id, moved);
+    this.store.delete(oldId);
+    this.logger.log(`Device ${oldId} moved to ${moved.id}`);
+    this.idChanges.next({ oldId, newId: moved.id });
+    return moved;
   }
 
   touch(id: string): void {

@@ -37,6 +37,8 @@ public:
 
 Q_SIGNALS:
     void audioStateChanged(bool available, bool enabled);
+    /** The session failed before the screen could be captured. */
+    void captureFailed(const QString &reason);
 
 protected:
     QUrl appUrl() const override;
@@ -56,6 +58,7 @@ private:
     QList<QPointer<QScreen>> m_sharedScreens;
     bool m_connected = false;
     bool m_audioAvailable = false;
+    bool m_captureStarted = false;
     bool m_audioEnabled = true;
 };
 

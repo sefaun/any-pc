@@ -66,6 +66,7 @@ Q_SIGNALS:
 private:
     void onIncoming(const QString &connectionId, const protocol::DeviceSummary &from, const QString &password,
                     int expiresInMs);
+    void onCaptureFailed(const QString &reason);
     void onPending(const QString &requestId, const QString &connectionId, const protocol::DeviceSummary &target);
     static QString phoneTargetMessage();
     void onAccepted(const QString &connectionId, protocol::Role role, const protocol::DeviceSummary &peer);

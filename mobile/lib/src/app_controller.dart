@@ -6,6 +6,7 @@ import 'package:flutter/foundation.dart';
 import 'package:path_provider/path_provider.dart';
 
 import 'core/app_settings.dart';
+import 'core/device_id.dart';
 import 'core/recent_connections.dart';
 import 'core/server_url.dart';
 import 'net/api_client.dart';
@@ -14,7 +15,7 @@ import 'net/signaling_client.dart';
 import 'rtc/file_transfer.dart';
 import 'rtc/viewer_connection.dart';
 
-const String appVersion = String.fromEnvironment('APP_VERSION', defaultValue: '1.0.2');
+const String appVersion = String.fromEnvironment('APP_VERSION', defaultValue: '1.1.0');
 
 enum OutgoingState { idle, requesting, waiting }
 
@@ -143,6 +144,36 @@ class AppController extends ChangeNotifier {
       final delay = min(1000 * (1 << min(_retryAttempt++, 5)), 30000);
       _retryTimer = Timer(Duration(milliseconds: delay), authenticate);
     }
+  }
+
+  /// Gives this device a new random address (the secret stays the same) and
+  /// reconnects under it. Reports the outcome through [messages].
+  Future<void> changeDeviceId() async {
+    final base = serverUrl;
+    final secret = settings.deviceSecret;
+    if (base == null || secret == null) return;
+    try {
+      final response = await api.post('/devices/me/change-id');
+      final id = response['deviceId'];
+      final token = response['accessToken'];
+      if (id is! String || token is! String) throw ApiException(0, 'unexpected server response');
+      await endSession(byUser: true);
+      _clearOutgoing();
+      await settings.setDeviceCredentials(id, secret);
+      deviceId = id;
+      api.accessToken = token;
+      signaling.disconnect();
+      signaling.connect(base, token);
+      final expiresIn = response['expiresIn'] is int ? response['expiresIn'] as int : 3600;
+      _refreshTimer?.cancel();
+      _refreshTimer = Timer(Duration(seconds: max(60, expiresIn * 8 ~/ 10)), authenticate);
+      _messages.add('This phone\'s new address is ${DeviceId.format(id)}.');
+    } on ApiException catch (e) {
+      _messages.add(e.status == 404
+          ? 'The server does not support new addresses yet; update it to 1.1.0 or later.'
+          : 'Could not get a new address: ${e.message}');
+    }
+    notifyListeners();
   }
 
   // ---- Outgoing connections ------------------------------------------------------------

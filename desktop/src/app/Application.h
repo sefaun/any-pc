@@ -33,6 +33,7 @@ private:
     void onAuthenticated(const QString &deviceId, const QString &accessToken, int expiresInSeconds);
     void scheduleRetry();
     void onServerUrlChanged();
+    void changeDeviceId();
 
     AppSettings *m_settings;
     ApiClient *m_api;

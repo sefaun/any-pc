@@ -65,6 +65,11 @@ export class SignalingGateway
 
   afterInit(): void {
     this.eventsSubscription = this.connections.events$.subscribe((e) => this.onConnectionEvent(e));
+    // A device that changed its address leaves every session under the old one.
+    // Its socket stays open: the client reconnects itself with the new token.
+    this.eventsSubscription.add(
+      this.devices.idChanges$.subscribe(({ oldId }) => this.connections.endAllFor(oldId)),
+    );
     this.heartbeat = setInterval(() => this.sweep(), HEARTBEAT_INTERVAL_MS);
     this.heartbeat.unref();
   }

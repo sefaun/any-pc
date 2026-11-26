@@ -150,18 +150,6 @@ void SessionManager::onIncoming(const QString &connectionId, const protocol::Dev
         m_signaling->respondToConnection(connectionId, false);
         return;
     }
-    if (!ScreenCapturePermission::isGranted()) {
-        // Accepting would only end in a failed capture; explain it instead.
-        qCWarning(lcSessions) << "Rejecting" << from.id << "- no screen recording permission";
-        m_signaling->respondToConnection(connectionId, false);
-        ScreenCapturePermission::request();
-        Q_EMIT permissionRequired(
-            tr("%1 (%2) tried to connect, but AnyPC is not allowed to record this screen.")
-                .arg(from.name, DeviceId::format(from.id)),
-            tr("Open System Settings > Privacy & Security > Screen Recording, turn on AnyPC and "
-               "restart AnyPC. Then connect again."));
-        return;
-    }
     if (!password.isEmpty()) {
         // An unattended attempt: accept on a correct password, refuse otherwise.
         const bool valid = m_settings->verifyUnattendedPassword(password);
@@ -197,6 +185,7 @@ void SessionManager::onAccepted(const QString &connectionId, protocol::Role role
     } else {
         auto *host = new HostSession(connectionId, peer, m_api, m_settings, this);
         connect(host, &HostSession::audioStateChanged, this, &SessionManager::hostAudioStateChanged);
+        connect(host, &HostSession::captureFailed, this, &SessionManager::onCaptureFailed);
         startSession(host);
         Q_EMIT hostSessionStarted(peer);
     }
@@ -275,6 +264,24 @@ void SessionManager::showHostTransfers()
             return;
         }
     }
+}
+
+void SessionManager::onCaptureFailed(const QString &reason)
+{
+    // macOS's own permission check can be wrong (e.g. after an update of an
+    // ad-hoc signed app), so the capture is always attempted and the
+    // permission is only blamed when the capture really failed.
+    if (!ScreenCapturePermission::isRestricted()) {
+        Q_EMIT notification(tr("Screen capture failed: %1").arg(reason));
+        return;
+    }
+    ScreenCapturePermission::request();
+    Q_EMIT permissionRequired(
+        tr("AnyPC could not record this screen, so the remote side was disconnected."),
+        tr("Open System Settings > Privacy & Security > Screen Recording (\"Screen & System Audio "
+           "Recording\"). If AnyPC is listed, select it and remove it with the minus (-) button, "
+           "then add it again or turn it on when asked. Restart AnyPC and connect again.\n\nDetails: %1")
+            .arg(reason));
 }
 
 void SessionManager::setHostAudioEnabled(bool enabled)

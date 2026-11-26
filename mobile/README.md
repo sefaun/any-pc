@@ -6,7 +6,8 @@ Flutter ile yazılmış Android ve iOS istemcisi. Telefondan, AnyPC masaüstü u
 
 - İlk açılışta sunucu adresi sorulur ve `/api/v1/health` ile doğrulanır.
 - 9 haneli adresle bağlanma, gözetimsiz erişim şifresi desteği.
-- **Karekod (QR)**: Adres alanındaki tarama düğmesiyle kamera açılır; masaüstü uygulamasındaki karekod okutulunca adres otomatik yazılır. Telefonun kendi adresi de karekod olarak gösterilebilir (menü → *My QR code* veya ana ekrandaki "This phone" satırı); kayıtlı bilgisayarların karekodu da uzun basma menüsünden açılır. Karekod içeriği `anypc://connect?id=<adres>` biçimindedir.
+- **Yeni adres:** Menüdeki *Get a new address* ile telefona rastgele yeni bir adres alınır; eski adres hemen geçersiz olur.
+- **Karekod (QR)**: Adres alanındaki tarama düğmesiyle kamera açılır; masaüstü uygulamasındaki karekod okutulunca adres yazılır ve bağlantı isteği hemen gönderilir. Telefonun kendi adresi de karekod olarak gösterilebilir (menü → *My QR code* veya ana ekrandaki "This phone" satırı); kayıtlı bilgisayarların karekodu da uzun basma menüsünden açılır. Karekod içeriği `anypc://connect?id=<adres>` biçimindedir.
 - **Recent sessions**: Daha önce bağlanılan bilgisayarlar listelenir. Dokununca bağlanır; uzun basınca yeniden adlandır, adresi kopyala ve sil seçenekleri çıkar. Liste sadece telefonda saklanır.
 - Uzak ekran: Cloudflare SFU üzerinden WebRTC video.
 - Dokunmatik kontrol:

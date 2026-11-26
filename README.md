@@ -176,7 +176,7 @@ Her release'te şu dosyalar yayınlanır:
 
 ### Kullanım
 
-- **This computer**: cihazın adresi. Kopyalayıp karşı tarafa iletin. Yanındaki karekod mobil uygulamayla okutulabilir; tıklayınca (veya *Enlarge*) büyük hâli açılır.
+- **This computer**: cihazın adresi. Kopyalayıp karşı tarafa iletin. Yanındaki yenile düğmesi bilgisayara rastgele **yeni bir adres** verir; eski adres hemen geçersiz olur, kaydedenler artık bağlanamaz ve açık oturumlar kapanır (sunucunun 1.1.0 veya üstü olması gerekir). Yanındaki karekod mobil uygulamayla okutulabilir; tıklayınca (veya *Enlarge*) büyük hâli açılır.
 - **Remote computer**: bağlanılacak adresi yazıp **Connect**'e basın. Karşı tarafta gözetimsiz erişim açıksa şifreyi de yazın.
 - **Recent sessions**: Daha önce bağlanılan bilgisayarlar kutucuk olarak listelenir (cihaz adı, adres, platform rengi, son bağlantı zamanı). Çift tıklayınca bağlanır; sağ tık menüsünde *Connect*, *Copy address*, *Rename…* ve *Remove from list* vardır. Liste yalnızca bu bilgisayarda saklanır; sunucuya gönderilmez ve şifre tutulmaz.
 - **Gözetimsiz erişim**: *Configure unattended access…* ile şifre belirleyin. Şifre cihazda PBKDF2-SHA256 ile hash'lenmiş olarak saklanır ve doğrulama host tarafında yapılır. Yanlış şifreyle gelen istek otomatik reddedilir.
@@ -192,7 +192,7 @@ Her release'te şu dosyalar yayınlanır:
 
 | Platform | Not |
 | --- | --- |
-| **macOS** | Uygulama açılışta *Ekran Kaydı*, ilk kontrol edilişte *Erişilebilirlik* iznini ister (Sistem Ayarları → Gizlilik ve Güvenlik). Ekran Kaydı izni yokken gelen bağlantılar reddedilir ve ne yapılacağı ekranda anlatılır; izin verdikten sonra AnyPC'yi yeniden başlatın. Build ad-hoc imzalı olduğu için her yeni sürümden sonra bu izinleri listeden kaldırıp yeniden vermek gerekebilir. Build ad-hoc imzalıdır; Gatekeeper uyarısında uygulamaya sağ tıklayıp *Aç* deyin. Dağıtım için Developer ID imzası + notarization ekleyin (`packaging/macos/build-dmg.sh`). |
+| **macOS** | *Ekran Kaydı* ve *Erişilebilirlik* izinleri gerekir (Sistem Ayarları → Gizlilik ve Güvenlik). Ekran kaydedilemezse bağlantı kapanır ve Mac'te ne yapılacağı anlatılır. 1.1.0'dan önceki sürümler her güncellemede macOS'a "farklı bir uygulama" gibi göründüğünden verilen izinler sessizce geçersiz kalıyordu; 1.1.0'a geçerken AnyPC'yi izin listesinden eksi (−) ile kaldırıp yeniden ekleyin (veya Terminal'de `tccutil reset ScreenCapture com.anypc.desktop` ve `tccutil reset Accessibility com.anypc.desktop`), sonra AnyPC'yi yeniden başlatın. Sonraki güncellemelerde izinler korunur. Build ad-hoc imzalıdır; Gatekeeper uyarısında uygulamaya sağ tıklayıp *Aç* deyin. Dağıtım için Developer ID imzası + notarization ekleyin (`packaging/macos/build-dmg.sh`). |
 | **Windows** | UIPI kuralı gereği yönetici olarak çalışan pencerelere input gönderebilmek için AnyPC'nin de yönetici olarak çalışması gerekir. UAC onay ekranı ve kilit ekranı (secure desktop) yakalanamaz. Installer imzasızdır, SmartScreen uyarı verebilir. |
 | **Linux** | Uzaktan kontrol için **X11** oturumu gerekir (XTest). Wayland'de ekran görüntülenebilir ama input enjeksiyonu desteklenmez; viewer "view only" moduna geçer. |
 

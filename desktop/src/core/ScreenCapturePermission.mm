@@ -4,6 +4,11 @@
 
 namespace anypc::ScreenCapturePermission {
 
+bool isRestricted()
+{
+    return true;
+}
+
 bool isGranted()
 {
     return CGPreflightScreenCaptureAccess();

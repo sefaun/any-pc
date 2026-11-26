@@ -2,6 +2,7 @@
 
 #include "BuildInfo.h"
 #include "core/AppSettings.h"
+#include "core/DeviceId.h"
 #include "core/ScreenCapturePermission.h"
 #include "network/ApiClient.h"
 #include "network/SignalingClient.h"
@@ -66,6 +67,7 @@ Application::Application(QObject *parent)
 
     connect(m_settings, &AppSettings::serverUrlChanged, this, &Application::onServerUrlChanged);
     connect(m_settings, &AppSettings::deviceNameChanged, this, &Application::authenticate);
+    connect(m_window.get(), &MainWindow::changeDeviceIdRequested, this, &Application::changeDeviceId);
 }
 
 Application::~Application()
@@ -102,6 +104,33 @@ void Application::onServerUrlChanged()
     m_api->setAccessToken({});
     m_retryAttempt = 0;
     authenticate();
+}
+
+void Application::changeDeviceId()
+{
+    m_api->post(QStringLiteral("/devices/me/change-id"), QJsonObject{}, [this](const ApiResponse &response) {
+        if (!response.ok()) {
+            qCWarning(lcApp) << "Changing the device ID failed:" << response.status << response.errorMessage;
+            m_window->showMessage(response.status == 404
+                                      ? tr("The server does not support new addresses yet; update it to 1.1.0 or later.")
+                                      : tr("Could not get a new address: %1").arg(response.errorMessage));
+            return;
+        }
+        const QJsonObject json = response.body.toObject();
+        const QString id = json.value(QLatin1String("deviceId")).toString();
+        const QString token = json.value(QLatin1String("accessToken")).toString();
+        if (id.isEmpty() || token.isEmpty()) {
+            m_window->showMessage(tr("Could not get a new address: unexpected server response."));
+            return;
+        }
+        qCInfo(lcApp) << "Device ID changed to" << id;
+        // The secret is unchanged; only the address moves. Reconnect under the new one.
+        m_settings->setDeviceCredentials(id, m_settings->deviceSecret());
+        m_sessions->endAll();
+        m_signaling->disconnectFromServer();
+        onAuthenticated(id, token, json.value(QLatin1String("expiresIn")).toInt());
+        m_window->showMessage(tr("This computer's new address is %1.").arg(DeviceId::format(id)));
+    });
 }
 
 void Application::authenticate()

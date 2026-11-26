@@ -7,6 +7,12 @@ import { toDeviceSummary, type DeviceRecord, type DeviceSummary } from './device
 import { DevicesService } from './devices.service';
 import { RegisterDeviceDto, type RegisterDeviceResponse } from './dto/register-device.dto';
 
+export interface ChangeDeviceIdResponse {
+  deviceId: string;
+  accessToken: string;
+  expiresIn: number;
+}
+
 @Controller('devices')
 export class DevicesController {
   constructor(
@@ -27,6 +33,20 @@ export class DevicesController {
       accessToken: token.accessToken,
       expiresIn: token.expiresIn,
     };
+  }
+
+  /**
+   * Gives the calling device a new random address. Its secret is unchanged, so
+   * the client only has to store the new ID; active sessions are ended.
+   */
+  @Post('me/change-id')
+  @HttpCode(HttpStatus.OK)
+  @UseGuards(DeviceAuthGuard)
+  @Throttle({ default: { limit: 5, ttl: 60_000 } })
+  async changeId(@CurrentDevice() device: DeviceRecord): Promise<ChangeDeviceIdResponse> {
+    const moved = this.devices.changeId(device.id);
+    const token = await this.tokens.issueDeviceToken(moved.id);
+    return { deviceId: moved.id, accessToken: token.accessToken, expiresIn: token.expiresIn };
   }
 
   @Get('me')

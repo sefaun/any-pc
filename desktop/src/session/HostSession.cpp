@@ -11,6 +11,7 @@
 #include <QJsonArray>
 #include <QLoggingCategory>
 #include <QPixmap>
+#include <QRegularExpression>
 #include <QScreen>
 
 #include <QSize>
@@ -45,6 +46,14 @@ constexpr bool kSystemAudioSupported =
 #else
     true;
 #endif
+/** Errors getUserMedia/getDisplayMedia report when the screen cannot be captured. */
+bool isCaptureError(const QString &detail)
+{
+    static const QRegularExpression pattern(
+        QStringLiteral("permission|notallowed|notreadable|notfound|abort|capture|video source|screen"),
+        QRegularExpression::CaseInsensitiveOption);
+    return detail.isEmpty() || pattern.match(detail).hasMatch();
+}
 } // namespace
 
 HostSession::HostSession(const QString &connectionId, const protocol::DeviceSummary &peer, ApiClient *api,
@@ -58,6 +67,10 @@ HostSession::HostSession(const QString &connectionId, const protocol::DeviceSumm
     });
     connect(bridge(), &RtcBridge::captureChanged, this, &HostSession::onCaptureChanged);
     m_audioEnabled = settings->shareAudioEnabled();
+    connect(this, &RtcSession::stateChanged, this, [this](const QString &state, const QString &detail) {
+        if (state == QLatin1String("failed") && !m_captureStarted && isCaptureError(detail))
+            Q_EMIT captureFailed(detail.isEmpty() ? tr("The screen could not be captured.") : detail);
+    });
     connect(bridge(), &RtcBridge::hostAudioChanged, this, [this](bool available, bool enabled) {
         m_audioAvailable = available;
         m_audioEnabled = enabled;
@@ -84,6 +97,7 @@ HostSession::~HostSession()
 
 void HostSession::onCaptureChanged(int width, int height, const QByteArray &thumbnail)
 {
+    m_captureStarted = true;
     const QSize size(width, height);
     m_injector->setCaptureSize(size);
 
